@@ -105,7 +105,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Map className="h-5 w-5" />
-          <span>Route Visualization</span>
+          <span>Visualización de Ruta</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-6">
@@ -216,10 +216,10 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
         </div>
         <div className="w-full max-w-lg space-y-4">
             <div className='flex justify-between items-center'>
-                <h4 className='font-medium'>Step {currentStep + 1} of {flightPath.length}</h4>
+                <h4 className='font-medium'>Paso {currentStep + 1} de {flightPath.length}</h4>
                 <div className='flex gap-2'>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.max(0, s-1))} disabled={currentStep === 0}>Previous</Button>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.min(flightPath.length - 1, s+1))} disabled={currentStep === flightPath.length - 1}>Next</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.max(0, s-1))} disabled={currentStep === 0}>Anterior</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.min(flightPath.length - 1, s+1))} disabled={currentStep === flightPath.length - 1}>Siguiente</Button>
                 </div>
             </div>
           <Slider

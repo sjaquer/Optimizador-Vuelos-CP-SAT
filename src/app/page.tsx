@@ -61,7 +61,7 @@ export default function Home() {
               <Logo />
             </div>
             <Button variant="outline" size="sm" disabled>
-              Import from Excel
+              Importar desde Excel
             </Button>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
@@ -71,7 +71,7 @@ export default function Home() {
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold tracking-tight">
-                    Optimized Flight Plans
+                    Planes de Vuelo Optimizados
                   </h2>
                   <div className="flex items-center gap-2 rounded-md bg-muted p-1">
                     <Button
@@ -81,7 +81,7 @@ export default function Home() {
                       className="h-8"
                     >
                       <ListCollapse className="mr-2 h-4 w-4" />
-                      Plans
+                      Planes
                     </Button>
                     <Button
                       variant={activeTab === 'map' ? 'secondary' : 'ghost'}
@@ -90,7 +90,7 @@ export default function Home() {
                       className="h-8"
                     >
                       <Map className="mr-2 h-4 w-4" />
-                      Route
+                      Ruta
                     </Button>
                   </div>
                 </div>
@@ -124,17 +124,17 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
                 <Wind className="h-16 w-16 animate-spin text-primary" style={{ animationDuration: '3s' }} />
                 <Bot className="absolute inset-0 m-auto h-8 w-8 text-primary/80" />
               </div>
-              <h3 className="text-xl font-semibold">Generating Plans...</h3>
+              <h3 className="text-xl font-semibold">Generando Planes...</h3>
               <p className="text-muted-foreground">
-                Our AI is calculating the most efficient routes. Please wait a moment.
+                Nuestra IA está calculando las rutas más eficientes. Por favor espera un momento.
               </p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
               <Bot className="h-16 w-16 text-primary" />
-              <h3 className="text-xl font-semibold">Welcome to OVH</h3>
+              <h3 className="text-xl font-semibold">Bienvenido a OVH</h3>
               <p className="text-muted-foreground">
-                Define your scenario in the sidebar to the left, then click "Generate Flight Plan" to get started.
+                Define tu escenario en la barra lateral izquierda, luego haz clic en "Generar Plan de Vuelo" para comenzar.
               </p>
             </div>
           )}

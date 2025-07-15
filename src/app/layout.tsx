@@ -4,8 +4,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'OVH by sjaquer - Helicopter Routing Optimization',
-  description: 'Optimize helicopter flight plans for passenger transport between multiple stations.',
+  title: 'OVH por sjaquer - Optimización de Rutas de Helicóptero',
+  description: 'Optimiza los planes de vuelo de helicópteros para el transporte de pasajeros entre múltiples estaciones.',
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="es" className="h-full">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

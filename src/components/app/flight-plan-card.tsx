@@ -28,11 +28,11 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
   };
 
   const handleExport = () => {
-    const headers = ['Step', 'Action', 'Station', 'Passengers', 'Notes'];
+    const headers = ['Paso', 'Acción', 'Estación', 'Pasajeros', 'Notas'];
     const rows = plan.steps.map((step, index) => [
       index + 1,
       step.action,
-      step.station === 0 ? 'Base' : `Station ${step.station}`,
+      step.station === 0 ? 'Base' : `Estación ${step.station}`,
       step.passengers.map(p => p.name).join(', '),
       step.notes,
     ]);
@@ -44,7 +44,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `flight_plan_${plan.id}.csv`);
+    link.setAttribute("download", `plan_de_vuelo_${plan.id}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -63,15 +63,15 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
         <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Milestone className="h-4 w-4" />
-            <span>{plan.metrics.totalStops} Stops</span>
+            <span>{plan.metrics.totalStops} Paradas</span>
           </div>
           <div className="flex items-center gap-2">
             <Wind className="h-4 w-4" />
-            <span>{plan.metrics.totalDistance} Legs</span>
+            <span>{plan.metrics.totalDistance} Tramos</span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            <span>{plan.metrics.passengersTransported} Pax</span>
+            <span>{plan.metrics.passengersTransported} Pasajeros</span>
           </div>
         </div>
       </CardHeader>
@@ -80,10 +80,10 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
           <Table>
             <TableHeader className="sticky top-0 bg-card">
               <TableRow>
-                <TableHead className="w-[80px]">Action</TableHead>
-                <TableHead>Station</TableHead>
-                <TableHead>Passengers</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead className="w-[80px]">Acción</TableHead>
+                <TableHead>Estación</TableHead>
+                <TableHead>Pasajeros</TableHead>
+                <TableHead>Notas</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -96,7 +96,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {step.station === 0 ? 'Base' : `Station ${step.station}`}
+                    {step.station === 0 ? 'Base' : `Estación ${step.station}`}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

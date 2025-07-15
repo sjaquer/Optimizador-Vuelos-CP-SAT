@@ -28,7 +28,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
         action: 'TRAVEL',
         station: targetStation,
         passengers: deepCopy(helicopterLoad),
-        notes: `Flying to Station ${targetStation}`,
+        notes: `Volando a Estación ${targetStation}`,
       });
       currentStation = targetStation;
     }
@@ -49,7 +49,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
             action: 'PICKUP',
             station: currentStation,
             passengers: passengersToPickup,
-            notes: `Picked up ${passengersToPickup.length} passenger(s).`,
+            notes: `Recogido(s) ${passengersToPickup.length} pasajero(s).`,
         });
     }
 
@@ -61,7 +61,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
         action: 'TRAVEL',
         station: 0,
         passengers: deepCopy(helicopterLoad),
-        notes: 'Returning to Base.',
+        notes: 'Regresando a la Base.',
       });
       currentStation = 0;
     }
@@ -73,7 +73,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
         action: 'DROPOFF',
         station: 0,
         passengers: deepCopy(helicopterLoad),
-        notes: `Dropped off ${helicopterLoad.length} passenger(s) at Base.`,
+        notes: `Dejado(s) ${helicopterLoad.length} pasajero(s) en la Base.`,
       });
       helicopterLoad = [];
     }
@@ -81,7 +81,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
 
   return {
     id: 'priority_first',
-    title: 'Plan A: Priority First',
+    title: 'Plan A: Prioridad Primero',
     steps,
     metrics: {
       totalStops: steps.filter(s => s.action !== 'TRAVEL').length,
@@ -111,7 +111,7 @@ export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
         
         // 1. Travel to station
         if(currentStation !== targetStation) {
-            steps.push({ action: 'TRAVEL', station: targetStation, passengers: deepCopy(helicopterLoad), notes: `Flying to Station ${targetStation}` });
+            steps.push({ action: 'TRAVEL', station: targetStation, passengers: deepCopy(helicopterLoad), notes: `Volando a Estación ${targetStation}` });
             currentStation = targetStation;
         }
 
@@ -127,27 +127,27 @@ export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
         }
 
         if (passengersToPickup.length > 0) {
-            steps.push({ action: 'PICKUP', station: currentStation, passengers: passengersToPickup, notes: `Picked up ${passengersToPickup.length} pax.` });
+            steps.push({ action: 'PICKUP', station: currentStation, passengers: passengersToPickup, notes: `Recogido(s) ${passengersToPickup.length} pasajero(s).` });
         }
     }
     
     // After trip, return to base
     if (currentStation !== 0) {
-        steps.push({ action: 'TRAVEL', station: 0, passengers: deepCopy(helicopterLoad), notes: 'Returning to Base.' });
+        steps.push({ action: 'TRAVEL', station: 0, passengers: deepCopy(helicopterLoad), notes: 'Regresando a la Base.' });
         currentStation = 0;
     }
 
     // Drop off
     if (currentStation === 0 && helicopterLoad.length > 0) {
         transportedCount += helicopterLoad.length;
-        steps.push({ action: 'DROPOFF', station: 0, passengers: deepCopy(helicopterLoad), notes: `Dropped off ${helicopterLoad.length} pax at Base.` });
+        steps.push({ action: 'DROPOFF', station: 0, passengers: deepCopy(helicopterLoad), notes: `Dejado(s) ${helicopterLoad.length} pasajero(s) en la Base.` });
         helicopterLoad = [];
     }
   }
 
   return {
     id: 'capacity_fill',
-    title: 'Plan B: Capacity Fill',
+    title: 'Plan B: Llenar Capacidad',
     steps,
     metrics: {
         totalStops: steps.filter(s => s.action !== 'TRAVEL').length,
