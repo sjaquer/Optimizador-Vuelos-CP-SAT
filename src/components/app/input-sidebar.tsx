@@ -59,9 +59,9 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      numStations: scenario.numStations,
-      helicopterCapacity: scenario.helicopterCapacity,
-      passengers: scenario.passengers,
+      numStations: 6,
+      helicopterCapacity: 4,
+      passengers: [],
       scenarioDescription: 'Un escenario de evacuación médica en una remota región montañosa con 5 clínicas de campo y un hospital principal. Varios pacientes con distintos niveles de urgencia necesitan ser transportados.',
     },
   });
@@ -71,18 +71,30 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     name: 'passengers',
   });
 
+  // Sincronizar el formulario cuando el escenario cambia desde el exterior (ej. importación de Excel)
+  useEffect(() => {
+    form.reset({
+      ...scenario,
+      scenarioDescription: form.getValues('scenarioDescription'),
+    });
+  }, [scenario, form]);
+
+
   const watchedFields = form.watch();
-  const prevWatchedFieldsRef = useRef(JSON.stringify(watchedFields));
+  const isMounted = useRef(false);
 
   useEffect(() => {
-    const currentWatchedFields = JSON.stringify(watchedFields);
-    if (prevWatchedFieldsRef.current !== currentWatchedFields) {
-      const { scenarioDescription, ...restOfScenario } = watchedFields;
-      form.clearErrors(); // Prevent stale errors after AI generation
-      setScenario(restOfScenario);
-      prevWatchedFieldsRef.current = currentWatchedFields;
+    // Evitar sobreescribir el estado al montar el componente
+    if (!isMounted.current) {
+        isMounted.current = true;
+        return;
     }
-  }, [watchedFields, setScenario, form]);
+    const subscription = form.watch((value) => {
+      const { scenarioDescription, ...restOfScenario } = value as FormValues;
+      setScenario(restOfScenario);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, setScenario]);
 
   const handleGenerateData = async () => {
     const scenarioDescription = form.getValues('scenarioDescription');
@@ -101,6 +113,10 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       form.setValue('numStations', data.numStations);
       form.setValue('helicopterCapacity', data.helicopterCapacity);
       form.setValue('passengers', passengersWithId);
+      
+      const { scenarioDescription: desc, ...restOfScenario } = form.getValues();
+      setScenario(restOfScenario);
+
       toast({
         title: 'Datos Generados',
         description: 'Los datos del escenario se han completado con éxito.',
@@ -120,7 +136,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
   useEffect(() => {
     fields.forEach((field, index) => {
       if (field.station > maxStation) {
-        form.setValue(`passengers.${index}.station`, maxStation);
+        form.setValue(`passengers.${index}.station`, maxStation, { shouldValidate: true });
       }
     });
   }, [maxStation, fields, form]);
@@ -135,7 +151,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       <SidebarContent>
         <ScrollArea className="h-full px-2">
           <Form {...form}>
-            <form className="flex h-full flex-col">
+            <form className="flex h-full flex-col" onSubmit={(e) => e.preventDefault()}>
               <div className="flex-1">
                 <SidebarGroup>
                   <SidebarGroupLabel>Generador IA</SidebarGroupLabel>
@@ -174,6 +190,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           <FormControl>
                             <Input type="number" {...field} />
                           </FormControl>
+                           <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -186,6 +203,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           <FormControl>
                             <Input type="number" {...field} />
                           </FormControl>
+                           <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -202,7 +220,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           name={`passengers.${index}.name`}
                           render={({ field }) => (
                             <FormItem className="flex-1">
-                              <FormLabel>Nombre</FormLabel>
+                              <FormLabel className="text-xs">Nombre</FormLabel>
                               <FormControl>
                                 <Input {...field} />
                               </FormControl>
@@ -214,7 +232,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           name={`passengers.${index}.priority`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Prio</FormLabel>
+                              <FormLabel className="text-xs">Prio</FormLabel>
                               <FormControl>
                                 <Input type="number" min="1" max="5" className="w-16" {...field} />
                               </FormControl>
@@ -226,7 +244,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           name={`passengers.${index}.station`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Estación</FormLabel>
+                              <FormLabel className="text-xs">Est.</FormLabel>
                               <FormControl>
                                 <Input type="number" min="1" max={maxStation} className="w-16" {...field} />
                               </FormControl>

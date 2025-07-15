@@ -1,23 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   SidebarProvider,
   Sidebar,
   SidebarInset,
-  SidebarHeader,
-  SidebarContent,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { InputSidebar } from '@/components/app/input-sidebar';
-import type { FlightPlan, ScenarioData } from '@/lib/types';
+import type { FlightPlan, Passenger, ScenarioData } from '@/lib/types';
 import { generatePlan, generateAlternativePlan } from '@/lib/optimizer';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
 import { Logo } from '@/components/app/logo';
-import { Bot, Map, ListCollapse, Wind } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, SidebarTrigger, Upload } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const [scenario, setScenario] = useState<ScenarioData>({
@@ -28,6 +27,8 @@ export default function Home() {
   const [flightPlans, setFlightPlans] = useState<FlightPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('plans');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleGeneratePlans = () => {
     setIsLoading(true);
@@ -39,6 +40,69 @@ export default function Home() {
       setIsLoading(false);
       setActiveTab('plans');
     }, 500);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // --- Parsear Hoja de Configuración ---
+        const configSheet = workbook.Sheets['Configuracion'];
+        if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
+        const configData = XLSX.utils.sheet_to_json<{ Clave: string; Valor: number }>(configSheet);
+
+        const numStations = configData.find(row => row.Clave === 'numStations')?.Valor;
+        const helicopterCapacity = configData.find(row => row.Clave === 'helicopterCapacity')?.Valor;
+
+        if (numStations === undefined || helicopterCapacity === undefined) {
+          throw new Error("El formato de la hoja 'Configuracion' es incorrecto.");
+        }
+
+        // --- Parsear Hoja de Pasajeros ---
+        const passengersSheet = workbook.Sheets['Pasajeros'];
+        if (!passengersSheet) throw new Error("No se encontró la hoja 'Pasajeros'.");
+        const passengersData = XLSX.utils.sheet_to_json<{ nombre: string; prioridad: number; estacion: number }>(passengersSheet);
+
+        const passengers: Passenger[] = passengersData.map((p, index) => ({
+          id: crypto.randomUUID(),
+          name: p.nombre,
+          priority: p.prioridad,
+          station: p.estacion,
+        }));
+        
+        if (passengers.some(p => !p.name || !p.priority || !p.station)) {
+            throw new Error("La hoja 'Pasajeros' tiene filas incompletas.");
+        }
+
+        setScenario({ numStations, helicopterCapacity, passengers });
+        toast({
+          title: 'Éxito',
+          description: 'Los datos del escenario se importaron correctamente desde Excel.',
+        });
+
+      } catch (error) {
+        console.error("Error al importar el archivo:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error de Importación',
+          description: error instanceof Error ? error.message : 'No se pudo procesar el archivo Excel.',
+        });
+      } finally {
+        // Reset file input para permitir subir el mismo archivo de nuevo
+        if(event.target) event.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const selectedPlan = flightPlans[0];
@@ -60,12 +124,20 @@ export default function Home() {
               <SidebarTrigger className="md:hidden" />
               <Logo />
             </div>
-            <Button variant="outline" size="sm" disabled>
-              Importar desde Excel
+            <Button variant="outline" size="sm" onClick={handleImportClick}>
+                <Upload className="mr-2 h-4 w-4" />
+                Importar desde Excel
             </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".xlsx, .xls"
+              className="hidden"
+            />
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
-            {flightPlans.length === 0 ? (
+            {flightPlans.length === 0 && scenario.passengers.length === 0 ? (
               <WelcomeScreen isLoading={isLoading} />
             ) : (
               <div className="flex flex-col gap-6">
@@ -134,7 +206,7 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
               <Bot className="h-16 w-16 text-primary" />
               <h3 className="text-xl font-semibold">Bienvenido a OVH</h3>
               <p className="text-muted-foreground">
-                Define tu escenario en la barra lateral izquierda, luego haz clic en "Generar Plan de Vuelo" para comenzar.
+                Define tu escenario en la barra lateral izquierda, o importa un archivo Excel, luego haz clic en "Generar Plan de Vuelo" para comenzar.
               </p>
             </div>
           )}
