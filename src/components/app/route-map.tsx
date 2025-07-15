@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FlightPlan } from '@/lib/types';
-import { Map, Pin, Milestone, Helicopter } from 'lucide-react';
+import { Map, Pin, Milestone, Plane } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 
@@ -172,7 +172,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
             
             {helicopterPosition && (
               <g transform={`translate(${helicopterPosition.x}, ${helicopterPosition.y})`} className="transition-transform duration-500 ease-in-out">
-                 <Helicopter className="h-8 w-8 -translate-x-4 -translate-y-10 text-accent-foreground fill-accent" />
+                 <Plane className="h-8 w-8 -translate-x-4 -translate-y-10 text-accent-foreground fill-accent" />
               </g>
             )}
 

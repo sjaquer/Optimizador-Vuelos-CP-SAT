@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { FlightPlan, ScenarioData } from '@/lib/types';
-import { PlaneTakeoff, PlaneLand, User, Users, Wind, Milestone, Download } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface FlightPlanCardProps {
@@ -19,7 +19,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
       case 'PICKUP':
         return <PlaneTakeoff className="h-4 w-4 text-green-600" />;
       case 'DROPOFF':
-        return <PlaneLand className="h-4 w-4 text-blue-600" />;
+        return <PlaneLanding className="h-4 w-4 text-blue-600" />;
       case 'TRAVEL':
         return <Wind className="h-4 w-4 text-muted-foreground" />;
       default:
