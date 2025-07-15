@@ -95,7 +95,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
     }
   }
   
-  if (currentStation !== 0) {
+  if (currentStation !== 0 && steps[steps.length - 1]?.station !== 0) {
     steps.push({
       action: 'TRAVEL',
       station: 0,
@@ -127,10 +127,29 @@ export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
   let currentStation = 0; 
   let passengersDelivered = 0;
 
+  // --- Start of new logic ---
+  // Create station coordinates based on the map visualization
+  const stationCoords: Record<number, { x: number; y: number }> = { 0: { x: 0, y: 0 } };
+  const radius = 100; // Arbitrary radius for calculation
+  for (let i = 1; i <= scenario.numStations; i++) {
+    const angle = (i - 1) * (2 * Math.PI / scenario.numStations) - Math.PI / 2;
+    stationCoords[i] = {
+      x: radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+    };
+  }
+
+  const getDistance = (from: number, to: number) => {
+    const fromCoord = stationCoords[from];
+    const toCoord = stationCoords[to];
+    return Math.sqrt(Math.pow(toCoord.x - fromCoord.x, 2) + Math.pow(toCoord.y - fromCoord.y, 2));
+  };
+  
   const getNextClosestStation = (from: number, availableStations: number[]): number => {
     if (availableStations.length === 0) return -1;
-    return availableStations.sort((a,b) => Math.abs(a - from) - Math.abs(b - from))[0];
+    return availableStations.sort((a,b) => getDistance(from, a) - getDistance(from, b))[0];
   }
+  // --- End of new logic ---
 
   while (passengersToPickup.length > 0 || passengersInHelicopter.length > 0) {
      // 1. Dropoff at current station
@@ -221,7 +240,7 @@ export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
       }
   }
   
-    if (currentStation !== 0) {
+    if (currentStation !== 0 && steps[steps.length - 1]?.station !== 0) {
         steps.push({
             action: 'TRAVEL',
             station: 0,
@@ -294,7 +313,7 @@ export function generateThirdPlan(scenario: ScenarioData): FlightPlan {
     passengersDelivered++;
   }
   
-  if (currentStation !== 0) {
+  if (currentStation !== 0 && steps[steps.length - 1]?.station !== 0) {
       steps.push({
           action: 'TRAVEL',
           station: 0,
