@@ -1,3 +1,4 @@
+
 import type { Passenger, FlightPlan, FlightStep, ScenarioData } from './types';
 
 const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
@@ -15,7 +16,8 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
 
   // Initial move from base if necessary
   if (passengersToPickup.length > 0) {
-    const firstPickupStation = passengersToPickup.sort((a,b) => a.priority - b.priority)[0].originStation;
+    const sortedByPriority = passengersToPickup.sort((a,b) => a.priority - b.priority);
+    const firstPickupStation = sortedByPriority[0].originStation;
     if (currentStation !== firstPickupStation) {
       steps.push({
         action: 'TRAVEL',
@@ -83,7 +85,7 @@ export function generatePlan(scenario: ScenarioData): FlightPlan {
           action: 'TRAVEL',
           station: nextStation,
           passengers: deepCopy(passengersInHelicopter),
-          notes: `Volando de Estación ${currentStation} a Estación ${nextStation}`,
+          notes: `Volando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextStation === 0 ? 'Base' : `Estación ${nextStation}`}`,
         });
         currentStation = nextStation;
       }
@@ -184,23 +186,28 @@ export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
                 action: 'TRAVEL',
                 station: nextStation,
                 passengers: deepCopy(passengersInHelicopter),
-                notes: `Volando de Estación ${currentStation} a Estación ${nextStation}`,
+                notes: `Volando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextStation === 0 ? 'Base' : `Estación ${nextStation}`}`,
             });
             currentStation = nextStation;
         } else if (allTargetStations.length > 0 && availablePickupStations.length === 0 && availableDropoffStations.length === 0) {
             // Stuck at a station with no one to pick up or drop off, but still people in the system.
             // This can happen if the closest station is the current one, but it's now empty of tasks.
-            const nextBestStation = getNextClosestStation(currentStation, allTargetStations.filter(s => s !== currentStation));
-            if(nextBestStation !== -1 && currentStation !== nextBestStation) {
-                 steps.push({
-                    action: 'TRAVEL',
-                    station: nextBestStation,
-                    passengers: deepCopy(passengersInHelicopter),
-                    notes: `Reposicionando de Estación ${currentStation} a Estación ${nextBestStation}`,
-                });
-                currentStation = nextBestStation;
+            const otherStations = allTargetStations.filter(s => s !== currentStation);
+            if (otherStations.length > 0) {
+                const nextBestStation = getNextClosestStation(currentStation, otherStations);
+                if(nextBestStation !== -1 && currentStation !== nextBestStation) {
+                     steps.push({
+                        action: 'TRAVEL',
+                        station: nextBestStation,
+                        passengers: deepCopy(passengersInHelicopter),
+                        notes: `Reposicionando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextBestStation === 0 ? 'Base' : `Estación ${nextBestStation}`}`,
+                    });
+                    currentStation = nextBestStation;
+                } else {
+                    break; 
+                }
             } else {
-                break; // Break if no other option
+                break;
             }
         }
       }
@@ -226,5 +233,3 @@ export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
     },
   };
 }
-
-    

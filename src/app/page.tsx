@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -237,5 +238,3 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
     </div>
   );
 }
-
-    

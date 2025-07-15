@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
@@ -29,13 +30,13 @@ import { generateStartingData } from '@/ai/flows/generate-starting-data';
 import type { ScenarioData } from '@/lib/types';
 import { Bot, Plus, Trash2, Wind, ArrowRight } from 'lucide-react';
 import { Logo } from './logo';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 const passengerSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'El nombre es requerido'),
   priority: z.coerce.number().min(1).max(5),
-  originStation: z.coerce.number().min(1),
+  originStation: z.coerce.number().min(0), // 0 is base
   destinationStation: z.coerce.number().min(0), // 0 is base
 });
 
@@ -79,12 +80,11 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
   // Sync form when scenario changes from outside (e.g., Excel import)
   useEffect(() => {
-    // Transform passenger data to fit new schema if needed
     const transformedPassengers = scenario.passengers.map(p => ({
         ...p,
-        id: p.id || crypto.randomUUID(), // ensure id
-        originStation: (p as any).station ?? p.originStation, // Handle old format
-        destinationStation: p.destinationStation ?? 0, // Default to base
+        id: p.id || crypto.randomUUID(), 
+        originStation: p.originStation,
+        destinationStation: p.destinationStation,
     }))
 
     form.reset({
@@ -94,19 +94,20 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     });
   }, [scenario, form]);
   
-  const handleFormSubmit = () => {
-    const { scenarioDescription, ...restOfScenario } = form.getValues();
-    if(form.formState.isValid) {
-      setScenario(restOfScenario);
-      onGeneratePlans();
-    } else {
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    form.trigger().then(isValid => {
+      if (isValid) {
+        setScenario(form.getValues());
+        onGeneratePlans();
+      } else {
         toast({
             variant: "destructive",
             title: "Error de Validación",
             description: "Por favor, corrige los errores en el formulario antes de generar un plan.",
         })
-        form.trigger(); // show validation errors
-    }
+      }
+    });
   }
 
   const handleGenerateData = async () => {
@@ -122,11 +123,11 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
     try {
       const data = await generateStartingData({ scenarioDescription });
-      const passengersWithId = (data as any).passengers.map((p: any) => ({
+       const passengersWithId = (data as any).passengers.map((p: any) => ({
           ...p,
           id: crypto.randomUUID(),
-          originStation: p.station, // Adapt from old AI output
-          destinationStation: 0, // Default AI destination to base
+          originStation: p.originStation, 
+          destinationStation: p.destinationStation,
         }));
         
       const newScenario = {
@@ -135,11 +136,11 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
         passengers: passengersWithId,
       };
       
-      setScenario(newScenario); // Directly update the parent state
+      setScenario(newScenario);
       form.reset({
         ...newScenario,
         scenarioDescription: form.getValues('scenarioDescription'),
-      }); // and sync the form
+      }); 
 
       toast({
         title: 'Datos Generados',
@@ -159,10 +160,12 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
   
   useEffect(() => {
     fields.forEach((field, index) => {
-      if (field.originStation > maxStation) {
+      const originValue = form.getValues(`passengers.${index}.originStation`);
+      const destinationValue = form.getValues(`passengers.${index}.destinationStation`);
+      if (originValue > maxStation) {
         form.setValue(`passengers.${index}.originStation`, maxStation, { shouldValidate: true });
       }
-      if (field.destinationStation > maxStation) {
+      if (destinationValue > maxStation) {
         form.setValue(`passengers.${index}.destinationStation`, maxStation, { shouldValidate: true });
       }
     });
@@ -178,7 +181,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       <SidebarContent>
         <ScrollArea className="h-full px-2">
           <Form {...form}>
-            <form className="flex h-full flex-col" onSubmit={(e) => e.preventDefault()}>
+            <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
               <div className="flex-1">
                 <SidebarGroup>
                   <SidebarGroupLabel>Generador IA</SidebarGroupLabel>
@@ -283,9 +286,9 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                               name={`passengers.${index}.originStation`}
                               render={({ field }) => (
                                 <FormItem className="flex-1">
-                                  <FormLabel className="text-xs">Origen</FormLabel>
+                                  <FormLabel className="text-xs">Origen (0=Base)</FormLabel>
                                   <FormControl>
-                                    <Input type="number" min="1" max={maxStation} {...field} />
+                                    <Input type="number" min="0" max={maxStation} {...field} />
                                   </FormControl>
                                 </FormItem>
                               )}
@@ -324,17 +327,16 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                   </SidebarGroupContent>
                 </SidebarGroup>
               </div>
+               <SidebarFooter>
+                <Button type="submit" disabled={isLoading} className="w-full">
+                  {isLoading ? <Wind className="mr-2 animate-spin" /> : <Wind className="mr-2" />}
+                  Generar Plan de Vuelo
+                </Button>
+              </SidebarFooter>
             </form>
           </Form>
         </ScrollArea>
       </SidebarContent>
-      <Separator />
-      <SidebarFooter>
-        <Button onClick={handleFormSubmit} disabled={isLoading} className="w-full">
-          {isLoading ? <Wind className="mr-2 animate-spin" /> : <Wind className="mr-2" />}
-          Generar Plan de Vuelo
-        </Button>
-      </SidebarFooter>
     </>
   );
 }
