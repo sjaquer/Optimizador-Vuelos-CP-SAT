@@ -6,6 +6,7 @@ import {
   SidebarProvider,
   Sidebar,
   SidebarInset,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { InputSidebar } from '@/components/app/input-sidebar';
@@ -14,7 +15,7 @@ import { generatePlan, generateAlternativePlan } from '@/lib/optimizer';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
 import { Logo } from '@/components/app/logo';
-import { Bot, Map, ListCollapse, Wind, SidebarTrigger, Upload } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, Upload } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
