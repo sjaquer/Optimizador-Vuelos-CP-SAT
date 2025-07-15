@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { FlightPlan, ScenarioData } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download } from 'lucide-react';
+import type { FlightPlan, Passenger, ScenarioData, FlightStep } from '@/lib/types';
+import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download, ArrowRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface FlightPlanCardProps {
@@ -14,7 +14,7 @@ interface FlightPlanCardProps {
 }
 
 export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
-  const getActionIcon = (action: FlightPlan['steps'][0]['action']) => {
+  const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
       case 'PICKUP':
         return <PlaneTakeoff className="h-4 w-4 text-green-600" />;
@@ -33,7 +33,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
       index + 1,
       step.action,
       step.station === 0 ? 'Base' : `Estación ${step.station}`,
-      step.passengers.map(p => p.name).join(', '),
+      step.passengers.map(p => `${p.name} (P${p.priority})`).join(', '),
       step.notes,
     ]);
 
@@ -50,6 +50,20 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     document.body.removeChild(link);
   };
 
+  const getPassengerLabel = (passenger: Passenger, action: FlightStep['action']) => {
+    const originLabel = passenger.originStation === 0 ? 'B' : passenger.originStation;
+    const destLabel = passenger.destinationStation === 0 ? 'B' : passenger.destinationStation;
+
+    return (
+       <Badge variant="secondary" className="font-normal">
+          <User className="mr-1 h-3 w-3" />
+          {passenger.name} (P{passenger.priority})
+          <span className='mx-1.5 text-muted-foreground/80 flex items-center gap-0.5'>
+            {originLabel} <ArrowRight className='h-3 w-3'/> {destLabel}
+          </span>
+       </Badge>
+    )
+  }
 
   return (
     <Card className="flex h-full flex-col">
@@ -101,10 +115,9 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {step.passengers.map((p) => (
-                        <Badge key={p.id} variant="secondary" className="font-normal">
-                          <User className="mr-1 h-3 w-3" />
-                          {p.name} (P{p.priority})
-                        </Badge>
+                       <div key={p.id}>
+                          {getPassengerLabel(p, step.action)}
+                       </div>
                       ))}
                     </div>
                   </TableCell>
@@ -118,3 +131,5 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     </Card>
   );
 }
+
+    
