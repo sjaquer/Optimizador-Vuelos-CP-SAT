@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -5,13 +6,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { FlightPlan, Passenger, ScenarioData, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download, ArrowRight } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download, ArrowRight, Waypoints } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface FlightPlanCardProps {
   plan: FlightPlan;
   scenario: ScenarioData;
 }
+
+const actionTranslations: Record<FlightStep['action'], string> = {
+  PICKUP: 'RECOGER',
+  DROPOFF: 'DEJAR',
+  TRAVEL: 'VIAJAR',
+};
 
 export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
   const getActionIcon = (action: FlightStep['action']) => {
@@ -21,17 +28,21 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
       case 'DROPOFF':
         return <PlaneLanding className="h-4 w-4 text-blue-600" />;
       case 'TRAVEL':
-        return <Wind className="h-4 w-4 text-muted-foreground" />;
+        return <Waypoints className="h-4 w-4 text-muted-foreground" />;
       default:
         return null;
     }
   };
+  
+  const getActionLabel = (action: FlightStep['action']) => {
+    return actionTranslations[action] || action;
+  }
 
   const handleExport = () => {
     const headers = ['Paso', 'Acción', 'Estación', 'Pasajeros', 'Notas'];
     const rows = plan.steps.map((step, index) => [
       index + 1,
-      step.action,
+      getActionLabel(step.action),
       step.station === 0 ? 'Base' : `Estación ${step.station}`,
       step.passengers.map(p => `${p.name} (P${p.priority})`).join(', '),
       step.notes,
@@ -106,7 +117,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
                   <TableCell>
                     <div className="flex items-center gap-2 font-medium">
                       {getActionIcon(step.action)}
-                      <span>{step.action}</span>
+                      <span>{getActionLabel(step.action)}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -131,5 +142,3 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     </Card>
   );
 }
-
-    

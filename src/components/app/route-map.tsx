@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -31,13 +32,15 @@ function HelicopterIcon(props: React.SVGProps<SVGSVGElement>) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M2.5 12a5.5 5.5 0 0 1 11 0" />
-      <path d="M12.5 12H18a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1.5" />
-      <path d="M19 16V9a2 2 0 0 1 2-2h1" />
-      <path d="M22 7h-2" />
-      <path d="M8 12.5V21" />
-      <path d="M5 21h6" />
-      <path d="M8 8.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2.5" />
+      <path d="M10.2 2.6c.1.3.2.7.2 1.1v2.3"/>
+      <path d="M13.6 2.6c-.1.3-.2.7-.2 1.1v2.3"/>
+      <path d="M11.9 8.1V12h-2"/>
+      <path d="m5.9 8.1 1.4 1.4"/>
+      <path d="M21 12h-4.2c-.6 0-1.2.3-1.6.7L8 20"/>
+      <path d="m3.4 17.6 1.1-1.1"/>
+      <path d="M3 12h2.2c.6 0 1.2.3 1.6.7L12 20"/>
+      <path d="M12 8.1V6.9c0-.5-.4-1.2-1.2-1.2H8.4c-.8 0-1.2.7-1.2 1.2v1.2"/>
+      <path d="M21 12h.5a1.5 1.5 0 0 1 0 3H3"/>
     </svg>
   );
 }
@@ -91,6 +94,9 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
   const flightPath = plan.steps.filter(s => s.action === 'TRAVEL');
 
   const helicopterPosition = useMemo(() => {
+    if (flightPath.length === 0) {
+        return stationCoords[0];
+    }
     if (currentStep >= flightPath.length) {
       return stationCoords[flightPath[flightPath.length - 1]?.station ?? 0];
     }
@@ -100,12 +106,18 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
     return stationCoords[endStation];
   }, [currentStep, flightPath, stationCoords]);
 
+  // Reset step to 0 when plan changes
+  useState(() => {
+    setCurrentStep(0);
+  });
+
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Map className="h-5 w-5" />
-          <span>Visualización de Ruta</span>
+          <span>Visualización de Ruta ({plan.title})</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-6">
@@ -146,8 +158,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
             })}
             
             {/* Render active path */}
-            {flightPath.map((leg, index) => {
-              if (index > currentStep) return null;
+            {flightPath.slice(0, currentStep + 1).map((leg, index) => {
               const startStation = index > 0 ? flightPath[index-1].station : 0;
               const endStation = leg.station;
               const start = stationCoords[startStation];
@@ -165,12 +176,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
                   y2={end.y}
                   className="stroke-primary transition-all duration-300"
                   strokeWidth={isCurrentLeg ? "4" : "2"}
-                  markerEnd="url(#arrowhead)"
-                  style={{
-                    strokeDasharray: '500',
-                    strokeDashoffset: isCurrentLeg ? '0' : '500',
-                    animation: isCurrentLeg ? 'dash 1s linear forwards' : 'none',
-                  }}
+                  markerEnd={isCurrentLeg ? "url(#arrowhead)" : "none"}
                 />
               );
             })}
@@ -203,32 +209,24 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
             )}
 
           </svg>
-           <style jsx>{`
-                @keyframes dash {
-                  from {
-                    stroke-dashoffset: 500;
-                  }
-                  to {
-                    stroke-dashoffset: 0;
-                  }
-                }
-              `}</style>
         </div>
-        <div className="w-full max-w-lg space-y-4">
-            <div className='flex justify-between items-center'>
-                <h4 className='font-medium'>Paso {currentStep + 1} de {flightPath.length}</h4>
-                <div className='flex gap-2'>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.max(0, s-1))} disabled={currentStep === 0}>Anterior</Button>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.min(flightPath.length - 1, s+1))} disabled={currentStep === flightPath.length - 1}>Siguiente</Button>
-                </div>
-            </div>
-          <Slider
-            value={[currentStep]}
-            onValueChange={(value) => setCurrentStep(value[0])}
-            max={flightPath.length - 1}
-            step={1}
-          />
-        </div>
+        {flightPath.length > 0 && (
+          <div className="w-full max-w-lg space-y-4">
+              <div className='flex justify-between items-center'>
+                  <h4 className='font-medium'>Paso {currentStep + 1} de {flightPath.length}</h4>
+                  <div className='flex gap-2'>
+                      <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.max(0, s-1))} disabled={currentStep === 0}>Anterior</Button>
+                      <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.min(flightPath.length - 1, s+1))} disabled={currentStep >= flightPath.length - 1}>Siguiente</Button>
+                  </div>
+              </div>
+            <Slider
+              value={[currentStep]}
+              onValueChange={(value) => setCurrentStep(value[0])}
+              max={flightPath.length - 1}
+              step={1}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

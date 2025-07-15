@@ -10,13 +10,20 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, Passenger, ScenarioData } from '@/lib/types';
-import { generatePlan, generateAlternativePlan } from '@/lib/optimizer';
+import { generatePlan, generateAlternativePlan, generateThirdPlan } from '@/lib/optimizer';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
 import { Logo } from '@/components/app/logo';
-import { Bot, Map, ListCollapse, Wind, Upload } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, Upload, PlusCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,7 +35,9 @@ export default function Home() {
   });
   const [flightPlans, setFlightPlans] = useState<FlightPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAlternative, setIsLoadingAlternative] = useState(false);
   const [activeTab, setActiveTab] = useState('plans');
+  const [selectedPlanIndex, setSelectedPlanIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -43,6 +52,7 @@ export default function Home() {
     }
     setIsLoading(true);
     setFlightPlans([]);
+    setSelectedPlanIndex(0);
     // Use a timeout to allow the UI to update to the loading state
     setTimeout(() => {
       try {
@@ -62,6 +72,47 @@ export default function Home() {
       }
     }, 500);
   };
+  
+  const handleGenerateAlternative = () => {
+    if (scenario.passengers.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No hay pasajeros',
+        description: 'No se puede generar una alternativa sin un escenario base.',
+      });
+      return;
+    }
+    setIsLoadingAlternative(true);
+    setTimeout(() => {
+      try {
+        const plan3 = generateThirdPlan(scenario);
+        // Avoid adding duplicate plans
+        if (!flightPlans.some(p => p.id === plan3.id)) {
+          setFlightPlans(prevPlans => [...prevPlans, plan3]);
+          toast({
+            title: 'Plan Alternativo Generado',
+            description: 'Se ha añadido el Plan C a la lista.',
+          });
+        } else {
+           toast({
+            variant: 'default',
+            title: 'Plan ya existente',
+            description: 'El plan alternativo generado ya se encuentra en la lista.',
+          });
+        }
+      } catch (error) {
+         console.error("Error generating alternative plan:", error);
+         toast({
+          variant: 'destructive',
+          title: 'Error de Optimización',
+          description: error instanceof Error ? error.message : 'No se pudo generar un plan alternativo.',
+        });
+      } finally {
+        setIsLoadingAlternative(false);
+      }
+    }, 500)
+  }
+
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -124,7 +175,7 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  const selectedPlan = flightPlans[0];
+  const selectedPlan = flightPlans[selectedPlanIndex];
 
   return (
     <SidebarProvider>
@@ -168,25 +219,31 @@ export default function Home() {
                   <h2 className="text-2xl font-bold tracking-tight">
                     Planes de Vuelo Optimizados
                   </h2>
-                  <div className="flex items-center gap-2 rounded-md bg-muted p-1">
-                    <Button
-                      variant={activeTab === 'plans' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setActiveTab('plans')}
-                      className="h-8"
-                    >
-                      <ListCollapse className="mr-2 h-4 w-4" />
-                      Planes
+                  <div className='flex items-center gap-4'>
+                    <Button onClick={handleGenerateAlternative} disabled={isLoadingAlternative} size="sm" variant="outline">
+                      {isLoadingAlternative ? <Wind className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                      Generar Alternativa C
                     </Button>
-                    <Button
-                      variant={activeTab === 'map' ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => setActiveTab('map')}
-                      className="h-8"
-                    >
-                      <Map className="mr-2 h-4 w-4" />
-                      Ruta
-                    </Button>
+                    <div className="flex items-center gap-2 rounded-md bg-muted p-1">
+                      <Button
+                        variant={activeTab === 'plans' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setActiveTab('plans')}
+                        className="h-8"
+                      >
+                        <ListCollapse className="mr-2 h-4 w-4" />
+                        Planes
+                      </Button>
+                      <Button
+                        variant={activeTab === 'map' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setActiveTab('map')}
+                        className="h-8"
+                      >
+                        <Map className="mr-2 h-4 w-4" />
+                        Ruta
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 {activeTab === 'plans' && (
@@ -197,7 +254,24 @@ export default function Home() {
                   </div>
                 )}
                 {activeTab === 'map' && selectedPlan && (
+                  <>
+                  <div className='flex items-center gap-4'>
+                    <span className='text-sm font-medium'>Visualizando:</span>
+                     <Select value={String(selectedPlanIndex)} onValueChange={(val) => setSelectedPlanIndex(Number(val))}>
+                        <SelectTrigger className="w-[280px]">
+                          <SelectValue placeholder="Seleccionar un plan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {flightPlans.map((plan, index) => (
+                            <SelectItem key={plan.id} value={String(index)}>
+                              {plan.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                  </div>
                   <RouteMap plan={selectedPlan} numStations={scenario.numStations} />
+                  </>
                 )}
               </div>
             )}
