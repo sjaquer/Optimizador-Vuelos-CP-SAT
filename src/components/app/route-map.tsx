@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FlightPlan } from '@/lib/types';
-import { Map, Pin, Milestone, Plane } from 'lucide-react';
+import { Map } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 
@@ -16,6 +16,32 @@ interface Point {
   x: number;
   y: number;
 }
+
+function HelicopterIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2.5 12a5.5 5.5 0 0 1 11 0" />
+      <path d="M12.5 12H18a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-1.5" />
+      <path d="M19 16V9a2 2 0 0 1 2-2h1" />
+      <path d="M22 7h-2" />
+      <path d="M8 12.5V21" />
+      <path d="M5 21h6" />
+      <path d="M8 8.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2.5" />
+    </svg>
+  );
+}
+
 
 export function RouteMap({ plan, numStations }: RouteMapProps) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -172,7 +198,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
             
             {helicopterPosition && (
               <g transform={`translate(${helicopterPosition.x}, ${helicopterPosition.y})`} className="transition-transform duration-500 ease-in-out">
-                 <Plane className="h-8 w-8 -translate-x-4 -translate-y-10 text-accent-foreground fill-accent" />
+                 <HelicopterIcon className="h-8 w-8 -translate-x-4 -translate-y-10 text-accent-foreground fill-accent" />
               </g>
             )}
 
