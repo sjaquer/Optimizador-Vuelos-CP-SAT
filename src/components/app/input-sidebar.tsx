@@ -29,9 +29,10 @@ import { generateStartingData } from '@/ai/flows/generate-starting-data';
 import type { ScenarioData } from '@/lib/types';
 import { Bot, Plus, Trash2, Wind } from 'lucide-react';
 import { Logo } from './logo';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 const passengerSchema = z.object({
+  id: z.string(),
   name: z.string().min(1, 'Name is required'),
   priority: z.coerce.number().min(1).max(5),
   station: z.coerce.number().min(1),
@@ -70,13 +71,17 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     name: 'passengers',
   });
 
-  const watchAllFields = form.watch();
+  const watchedFields = form.watch();
+  const prevWatchedFieldsRef = useRef(JSON.stringify(watchedFields));
 
   useEffect(() => {
-    const { scenarioDescription, ...restOfScenario } = watchAllFields;
-    const passengersWithId = restOfScenario.passengers.map(p => ({ ...p, id: crypto.randomUUID() }));
-    setScenario({ ...restOfScenario, passengers: passengersWithId });
-  }, [watchAllFields, setScenario]);
+    const currentWatchedFields = JSON.stringify(watchedFields);
+    if (prevWatchedFieldsRef.current !== currentWatchedFields) {
+      const { scenarioDescription, ...restOfScenario } = watchedFields;
+      setScenario(restOfScenario);
+      prevWatchedFieldsRef.current = currentWatchedFields;
+    }
+  }, [watchedFields, setScenario]);
 
   const handleGenerateData = async () => {
     const scenarioDescription = form.getValues('scenarioDescription');
@@ -91,9 +96,10 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
     try {
       const data = await generateStartingData({ scenarioDescription });
+      const passengersWithId = data.passengers.map(p => ({...p, id: crypto.randomUUID()}));
       form.setValue('numStations', data.numStations);
       form.setValue('helicopterCapacity', data.helicopterCapacity);
-      form.setValue('passengers', data.passengers);
+      form.setValue('passengers', passengersWithId);
       toast({
         title: 'Data Generated',
         description: 'Scenario data has been populated successfully.',
@@ -126,7 +132,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       </SidebarHeader>
       <Separator />
       <SidebarContent>
-        <ScrollArea className="h-full">
+        <ScrollArea className="h-full px-2">
           <Form {...form}>
             <form className="flex h-full flex-col">
               <div className="flex-1">
@@ -241,7 +247,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                       type="button"
                       variant="outline"
                       className="w-full"
-                      onClick={() => append({ name: '', priority: 3, station: 1 })}
+                      onClick={() => append({ id: crypto.randomUUID(), name: '', priority: 3, station: 1 })}
                     >
                       <Plus className="mr-2" /> Add Passenger
                     </Button>
