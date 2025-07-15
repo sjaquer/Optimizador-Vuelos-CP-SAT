@@ -82,6 +82,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     // Transform passenger data to fit new schema if needed
     const transformedPassengers = scenario.passengers.map(p => ({
         ...p,
+        id: p.id || crypto.randomUUID(), // ensure id
         originStation: (p as any).station ?? p.originStation, // Handle old format
         destinationStation: p.destinationStation ?? 0, // Default to base
     }))
@@ -92,26 +93,21 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       scenarioDescription: form.getValues('scenarioDescription'),
     });
   }, [scenario, form]);
-
-
-  const watchedFields = form.watch();
-  const isMounted = useRef(false);
-
-  useEffect(() => {
-    if (!isMounted.current) {
-        isMounted.current = true;
-        return;
+  
+  const handleFormSubmit = () => {
+    const { scenarioDescription, ...restOfScenario } = form.getValues();
+    if(form.formState.isValid) {
+      setScenario(restOfScenario);
+      onGeneratePlans();
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Error de Validación",
+            description: "Por favor, corrige los errores en el formulario antes de generar un plan.",
+        })
+        form.trigger(); // show validation errors
     }
-    const subscription = form.watch((value, { name }) => {
-        if(name?.startsWith('passengers') || name === 'numStations' || name === 'helicopterCapacity') {
-             const { scenarioDescription, ...restOfScenario } = value as FormValues;
-             if (form.formState.isValid) {
-               setScenario(restOfScenario);
-             }
-        }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, setScenario, form.formState.isValid]);
+  }
 
   const handleGenerateData = async () => {
     const scenarioDescription = form.getValues('scenarioDescription');
@@ -132,12 +128,18 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
           originStation: p.station, // Adapt from old AI output
           destinationStation: 0, // Default AI destination to base
         }));
-      form.setValue('numStations', data.numStations);
-      form.setValue('helicopterCapacity', data.helicopterCapacity);
-      form.setValue('passengers', passengersWithId);
+        
+      const newScenario = {
+        numStations: data.numStations,
+        helicopterCapacity: data.helicopterCapacity,
+        passengers: passengersWithId,
+      };
       
-      const { scenarioDescription: desc, ...restOfScenario } = form.getValues();
-      setScenario(restOfScenario);
+      setScenario(newScenario); // Directly update the parent state
+      form.reset({
+        ...newScenario,
+        scenarioDescription: form.getValues('scenarioDescription'),
+      }); // and sync the form
 
       toast({
         title: 'Datos Generados',
@@ -153,7 +155,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     }
   };
   
-  const maxStation = form.getValues('numStations');
+  const maxStation = form.watch('numStations');
   
   useEffect(() => {
     fields.forEach((field, index) => {
@@ -302,8 +304,12 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                               )}
                             />
                         </div>
-                        <FormMessage>
-                            {form.formState.errors.passengers?.[index] && <p className="text-xs text-destructive">{form.formState.errors.passengers[index]?.root?.message}</p>}
+                         <FormMessage>
+                            {form.formState.errors.passengers?.[index]?.root?.message ||
+                             form.formState.errors.passengers?.[index]?.originStation?.message ||
+                             form.formState.errors.passengers?.[index]?.destinationStation?.message ||
+                             form.formState.errors.passengers?.[index]?.name?.message
+                            }
                         </FormMessage>
                       </div>
                     ))}
@@ -324,7 +330,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       </SidebarContent>
       <Separator />
       <SidebarFooter>
-        <Button onClick={onGeneratePlans} disabled={isLoading || scenario.passengers.length === 0} className="w-full">
+        <Button onClick={handleFormSubmit} disabled={isLoading} className="w-full">
           {isLoading ? <Wind className="mr-2 animate-spin" /> : <Wind className="mr-2" />}
           Generar Plan de Vuelo
         </Button>

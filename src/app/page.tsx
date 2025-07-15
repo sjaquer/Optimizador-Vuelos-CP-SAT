@@ -32,8 +32,17 @@ export default function Home() {
   const { toast } = useToast();
 
   const handleGeneratePlans = () => {
+    if (scenario.passengers.length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'No hay pasajeros',
+            description: 'Agregue al menos un pasajero para generar un plan de vuelo.',
+        });
+        return;
+    }
     setIsLoading(true);
     setFlightPlans([]);
+    // Use a timeout to allow the UI to update to the loading state
     setTimeout(() => {
       try {
         const plan1 = generatePlan(scenario);
@@ -44,7 +53,7 @@ export default function Home() {
         toast({
           variant: 'destructive',
           title: 'Error de Optimización',
-          description: 'No se pudo generar un plan de vuelo. Revise los datos del escenario.',
+          description: error instanceof Error ? error.message : 'No se pudo generar un plan de vuelo. Revise los datos del escenario.',
         });
       } finally {
          setIsLoading(false);
