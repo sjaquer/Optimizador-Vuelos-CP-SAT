@@ -2,7 +2,8 @@ export interface Passenger {
   id: string;
   name: string;
   priority: number;
-  station: number;
+  originStation: number;
+  destinationStation: number;
 }
 
 export interface FlightStep {

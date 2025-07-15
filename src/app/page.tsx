@@ -35,11 +35,21 @@ export default function Home() {
     setIsLoading(true);
     setFlightPlans([]);
     setTimeout(() => {
-      const plan1 = generatePlan(scenario);
-      const plan2 = generateAlternativePlan(scenario);
-      setFlightPlans([plan1, plan2]);
-      setIsLoading(false);
-      setActiveTab('plans');
+      try {
+        const plan1 = generatePlan(scenario);
+        const plan2 = generateAlternativePlan(scenario);
+        setFlightPlans([plan1, plan2]);
+      } catch (error) {
+        console.error("Error generating plans:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error de Optimización',
+          description: 'No se pudo generar un plan de vuelo. Revise los datos del escenario.',
+        });
+      } finally {
+         setIsLoading(false);
+         setActiveTab('plans');
+      }
     }, 500);
   };
 
@@ -57,7 +67,6 @@ export default function Home() {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        // --- Parsear Hoja de Configuración ---
         const configSheet = workbook.Sheets['Configuracion'];
         if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
         const configData = XLSX.utils.sheet_to_json<{ Clave: string; Valor: number }>(configSheet);
@@ -69,20 +78,20 @@ export default function Home() {
           throw new Error("El formato de la hoja 'Configuracion' es incorrecto.");
         }
 
-        // --- Parsear Hoja de Pasajeros ---
         const passengersSheet = workbook.Sheets['Pasajeros'];
         if (!passengersSheet) throw new Error("No se encontró la hoja 'Pasajeros'.");
-        const passengersData = XLSX.utils.sheet_to_json<{ nombre: string; prioridad: number; estacion: number }>(passengersSheet);
+        const passengersData = XLSX.utils.sheet_to_json<{ nombre: string; prioridad: number; origen: number; destino: number }>(passengersSheet);
 
         const passengers: Passenger[] = passengersData.map((p, index) => ({
           id: crypto.randomUUID(),
           name: p.nombre,
           priority: p.prioridad,
-          station: p.estacion,
+          originStation: p.origen,
+          destinationStation: p.destino,
         }));
         
-        if (passengers.some(p => !p.name || !p.priority || !p.station)) {
-            throw new Error("La hoja 'Pasajeros' tiene filas incompletas.");
+        if (passengers.some(p => !p.name || p.priority === undefined || p.originStation === undefined || p.destinationStation === undefined)) {
+            throw new Error("La hoja 'Pasajeros' tiene filas con datos incompletos o incorrectos.");
         }
 
         setScenario({ numStations, helicopterCapacity, passengers });
@@ -99,7 +108,6 @@ export default function Home() {
           description: error instanceof Error ? error.message : 'No se pudo procesar el archivo Excel.',
         });
       } finally {
-        // Reset file input para permitir subir el mismo archivo de nuevo
         if(event.target) event.target.value = '';
       }
     };
@@ -138,9 +146,13 @@ export default function Home() {
             />
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
-            {flightPlans.length === 0 && scenario.passengers.length === 0 ? (
-              <WelcomeScreen isLoading={isLoading} />
-            ) : (
+            {isLoading && (
+                 <WelcomeScreen isLoading={true} />
+            )}
+            {!isLoading && flightPlans.length === 0 && (
+              <WelcomeScreen isLoading={false} />
+            )}
+            {!isLoading && flightPlans.length > 0 && (
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold tracking-tight">
