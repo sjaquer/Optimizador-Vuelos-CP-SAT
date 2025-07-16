@@ -169,7 +169,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
         <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
           <div className="flex-1 min-h-0">
              {activeView === 'editor' && (
-              <SidebarContent className="group-data-[collapsible=icon]:hidden">
+              <SidebarContent className="group-data-[collapsible=icon]:hidden flex-1 min-h-0">
                 <ScrollArea className="h-full px-2">
                   <div className="group-data-[collapsible=icon]:hidden">
                     <SidebarHeader>
