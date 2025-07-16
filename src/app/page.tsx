@@ -22,16 +22,18 @@ import type { FlightPlan, Passenger, ScenarioData } from '@/lib/types';
 import { generatePlan, generateAlternativePlan, generateThirdPlan } from '@/lib/optimizer';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Logo } from '@/components/app/logo';
 import { Bot, Map, ListCollapse, Wind, Upload, PlusCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { saveScenarioToHistory } from '@/lib/history';
 
 export default function Home() {
   const [scenario, setScenario] = useState<ScenarioData>({
     numStations: 6,
     helicopterCapacity: 4,
     passengers: [],
+    weatherConditions: 'Despejado, vientos ligeros de 5 nudos.',
+    operationalNotes: 'Priorizar evacuaciones médicas. Todas las operaciones deben cesar al anochecer.',
   });
   const [flightPlans, setFlightPlans] = useState<FlightPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +61,11 @@ export default function Home() {
         const plan1 = generatePlan(scenario);
         const plan2 = generateAlternativePlan(scenario);
         setFlightPlans([plan1, plan2]);
+        saveScenarioToHistory(scenario);
+         toast({
+            title: 'Éxito',
+            description: 'Planes generados y escenario guardado en el historial.',
+          });
       } catch (error) {
         console.error("Error generating plans:", error);
         toast({
@@ -130,10 +137,12 @@ export default function Home() {
 
         const configSheet = workbook.Sheets['Configuracion'];
         if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
-        const configData = XLSX.utils.sheet_to_json<{ Clave: string; Valor: number }>(configSheet);
+        const configData = XLSX.utils.sheet_to_json<{ Clave: string; Valor: any }>(configSheet);
 
         const numStations = configData.find(row => row.Clave === 'numStations')?.Valor;
         const helicopterCapacity = configData.find(row => row.Clave === 'helicopterCapacity')?.Valor;
+        const weatherConditions = configData.find(row => row.Clave === 'weatherConditions')?.Valor || scenario.weatherConditions;
+        const operationalNotes = configData.find(row => row.Clave === 'operationalNotes')?.Valor || scenario.operationalNotes;
 
         if (numStations === undefined || helicopterCapacity === undefined) {
           throw new Error("El formato de la hoja 'Configuracion' es incorrecto.");
@@ -155,7 +164,7 @@ export default function Home() {
             throw new Error("La hoja 'Pasajeros' tiene filas con datos incompletos o incorrectos.");
         }
 
-        setScenario({ numStations, helicopterCapacity, passengers });
+        setScenario({ numStations, helicopterCapacity, passengers, weatherConditions, operationalNotes });
         toast({
           title: 'Éxito',
           description: 'Los datos del escenario se importaron correctamente desde Excel.',
@@ -192,7 +201,6 @@ export default function Home() {
           <header className="flex h-14 items-center justify-between border-b bg-card/50 px-4">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="md:hidden" />
-              <Logo />
             </div>
             <Button variant="outline" size="sm" onClick={handleImportClick}>
                 <Upload className="mr-2 h-4 w-4" />
@@ -295,13 +303,13 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
               </div>
               <h3 className="text-xl font-semibold">Generando Planes...</h3>
               <p className="text-muted-foreground">
-                Nuestra IA está calculando las rutas más eficientes. Por favor espera un momento.
+                El motor de optimización está calculando las rutas más eficientes. Por favor espera un momento.
               </p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
               <Bot className="h-16 w-16 text-primary" />
-              <h3 className="text-xl font-semibold">Bienvenido a OVH</h3>
+              <h3 className="text-xl font-semibold">Bienvenido, Roberto J. Jaque Culqui</h3>
               <p className="text-muted-foreground">
                 Define tu escenario en la barra lateral izquierda, o importa un archivo Excel, luego haz clic en "Generar Plan de Vuelo" para comenzar.
               </p>

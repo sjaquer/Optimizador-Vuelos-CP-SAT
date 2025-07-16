@@ -25,7 +25,10 @@ export interface FlightPlan {
 }
 
 export interface ScenarioData {
+    id?: string; // Unique identifier for history
     numStations: number;
     helicopterCapacity: number;
     passengers: Passenger[];
+    weatherConditions?: string;
+    operationalNotes?: string;
 }
