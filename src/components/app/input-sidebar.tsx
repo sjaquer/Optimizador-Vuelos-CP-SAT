@@ -26,7 +26,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import type { ScenarioData } from '@/lib/types';
-import { Plus, Trash2, Wind, ArrowRight, History, PanelLeftOpen } from 'lucide-react';
+import { Plus, Trash2, Wind, ArrowRight, History } from 'lucide-react';
 import { Logo } from './logo';
 import { useEffect, useState } from 'react';
 import { getHistory, deleteScenarioFromHistory } from '@/lib/history';
@@ -171,19 +171,10 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
          <Logo />
          <div className="flex items-center gap-2 rounded-md bg-sidebar-accent p-1">
             <Button
-              variant={activeView === 'editor' ? 'secondary' : 'ghost'}
-              size="icon"
-              className='h-7 w-7'
-              onClick={() => setActiveView('editor')}
-              aria-label="Editor"
-            >
-              <PanelLeftOpen />
-            </Button>
-            <Button
               variant={activeView === 'history' ? 'secondary' : 'ghost'}
               size="icon"
               className='h-7 w-7'
-              onClick={() => setActiveView('history')}
+              onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
               aria-label="Historial"
             >
               <History />
