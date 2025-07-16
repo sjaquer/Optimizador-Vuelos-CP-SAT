@@ -176,7 +176,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                       <Button
                         variant={'ghost'}
                         size="icon"
-                        className='h-7 w-7 self-end'
+                        className='h-7 w-7 self-end group-data-[collapsible=icon]:hidden'
                         onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
                         aria-label="Historial"
                       >
