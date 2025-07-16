@@ -77,7 +77,8 @@ export default function Home() {
         ];
         
         setGeneratedPlans(initialPlans);
-        setSelectedPlanId(initialPlans[0].id); // Automatically select the first plan
+        // We select the ID, but the actual plan will be populated by the card, which will then enable the map view.
+        setSelectedPlanId(initialPlans[0].id + '_M'); 
         
         saveScenarioToHistory(scenario);
          toast({
@@ -93,7 +94,7 @@ export default function Home() {
         });
       } finally {
          setIsLoading(false);
-         setActiveView('plans');
+         // Don't switch view yet, wait for a plan to be calculated
       }
     }, 500);
   };
@@ -159,35 +160,46 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handlePlanUpdate = (plan: FlightPlan) => {
+  const handlePlanUpdate = (updatedPlan: FlightPlan) => {
     setGeneratedPlans(currentPlans => {
-        const index = currentPlans.findIndex(cp => cp.id.startsWith(plan.id.split('_').slice(0, 2).join('_')));
-        if (index !== -1) {
-            const newPlans = [...currentPlans];
-            newPlans[index] = plan;
-            return newPlans;
-        }
-        return currentPlans;
+      // The base ID is the part before the shift suffix (_M or _T)
+      const baseId = updatedPlan.id.substring(0, updatedPlan.id.lastIndexOf('_'));
+      
+      const index = currentPlans.findIndex(cp => cp.id === baseId);
+      
+      if (index !== -1) {
+        const newPlans = [...currentPlans];
+        // We replace the placeholder plan with the fully calculated one.
+        // We keep the original description and title but use the new ID, steps, and metrics.
+        newPlans[index] = {
+            ...newPlans[index],
+            id: updatedPlan.id,
+            steps: updatedPlan.steps,
+            metrics: updatedPlan.metrics,
+        };
+        return newPlans;
+      }
+      return currentPlans;
     });
+
+    // If the updated plan is the currently selected one, it might now be possible to view the map.
+    if (selectedPlanId === updatedPlan.id && updatedPlan.steps.length > 0) {
+      // This is a good place to switch to map view if desired, or just let the button enable.
+    }
   };
+
 
   const handlePlanSelection = (planId: string) => {
     setSelectedPlanId(planId);
     const plan = generatedPlans.find(p => p.id === planId);
     if (plan && plan.steps.length > 0) {
+      setActiveView('map');
       setCurrentMapStep(0);
+    } else {
+      setActiveView('plans');
     }
   }
 
-  useEffect(() => {
-    if (selectedPlanId) {
-      const plan = generatedPlans.find(p => p.id === selectedPlanId);
-      if (plan && plan.steps.length === 0) {
-        setActiveView('plans');
-      }
-    }
-  }, [selectedPlanId, generatedPlans]);
-  
   return (
     <SidebarProvider>
       <Sidebar>
@@ -242,7 +254,7 @@ export default function Home() {
                             basePlan={plan} 
                             scenario={scenario} 
                             onPlanUpdate={handlePlanUpdate}
-                            onSelectPlan={() => handlePlanSelection(plan.id)}
+                            onSelectPlan={handlePlanSelection}
                             isSelected={selectedPlanId === plan.id}
                           />
                         ))}
@@ -316,5 +328,3 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
     </div>
   );
 }
-
-    

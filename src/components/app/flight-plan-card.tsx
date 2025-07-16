@@ -32,7 +32,7 @@ interface FlightPlanCardProps {
   basePlan: FlightPlan;
   scenario: ScenarioData;
   onPlanUpdate: (plan: FlightPlan) => void;
-  onSelectPlan: () => void;
+  onSelectPlan: (planId: string) => void;
   isSelected: boolean;
 }
 
@@ -48,20 +48,26 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   const [isLoading, setIsLoading] = useState(false);
 
   const strategy = useMemo(() => {
-     const parts = basePlan.id.split('_');
-     return parts.slice(0, 2).join('_') as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency';
+     return basePlan.id as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency';
   }, [basePlan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
     setIsLoading(true);
     const relevantItems = scenario.transportItems.filter(item => item.shift === shift);
     
+    // Create a temporary base plan with the correct strategy but empty steps
+    const planTemplate: FlightPlan = {
+      id: strategy,
+      title: basePlan.title,
+      description: basePlan.description,
+      steps: [],
+      metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
+    };
+
     if (relevantItems.length === 0) {
       const emptyPlan: FlightPlan = {
-        ...basePlan,
+        ...planTemplate,
         id: `${strategy}_${shift}`,
-        steps: [],
-        metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
       };
       setCurrentPlan(emptyPlan);
       onPlanUpdate(emptyPlan);
@@ -69,22 +75,25 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
       return;
     }
 
-    const newPlan = runFlightSimulation(basePlan, relevantItems, scenario, shift);
+    const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
     setCurrentPlan(newPlan);
     onPlanUpdate(newPlan);
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario, basePlan, strategy]); // onPlanUpdate is removed intentionally
+  }, [scenario, basePlan.id, basePlan.title, basePlan.description, strategy]); // onPlanUpdate is removed intentionally
   
   useEffect(() => {
+    // Generate the plan for the default shift ('M') when the component mounts or dependencies change
     generatePlanForShift(activeShift);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario, basePlan.id]); // Removed generatePlanForShift from deps to avoid re-running on every render
+  }, [scenario.transportItems, basePlan.id]); // Re-run only if items or base plan ID change
 
 
   const handleShiftChange = (shift: 'M' | 'T') => {
-    setActiveShift(shift);
-    generatePlanForShift(shift);
+    if (shift !== activeShift) {
+        setActiveShift(shift);
+        generatePlanForShift(shift);
+    }
   }
 
   const getActionIcon = (action: FlightStep['action']) => {
@@ -119,7 +128,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
       ]),
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
     });
-    doc.save(`plan_${currentPlan.id}_${activeShift}.pdf`);
+    doc.save(`plan_${strategy}_${activeShift}.pdf`);
   };
 
   const exportToExcel = () => {
@@ -148,7 +157,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `plan_${currentPlan.id}_${activeShift}.csv`);
+    link.setAttribute("download", `plan_${strategy}_${activeShift}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -172,9 +181,15 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   
   const hasContent = currentPlan.steps.length > 0;
   const itemTypesInPlan = useMemo(() => new Set(currentPlan.steps.flatMap(s => s.items).map(i => i.type)), [currentPlan]);
+  
+  const handleSelection = () => {
+    if (hasContent) {
+        onSelectPlan(currentPlan.id);
+    }
+  }
 
   return (
-    <Card className={cn("flex h-full flex-col transition-all cursor-pointer", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={onSelectPlan}>
+    <Card className={cn("flex h-full flex-col transition-all cursor-pointer", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={handleSelection}>
       <CardHeader>
         <div className='flex items-start justify-between gap-4'>
             <div className='flex-1'>
@@ -182,7 +197,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
               {currentPlan.description && <CardDescription className='mt-1'>{currentPlan.description}</CardDescription>}
             </div>
             <div className='flex items-center gap-2'>
-              <Select value={activeShift} onValueChange={handleShiftChange}>
+              <Select value={activeShift} onValueChange={(value) => handleShiftChange(value as 'M' | 'T')}>
                 <SelectTrigger className="w-[120px] h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -249,5 +264,3 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     </Card>
   );
 }
-
-    
