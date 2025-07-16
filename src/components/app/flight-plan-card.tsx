@@ -49,7 +49,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
 
   const strategy = useMemo(() => {
      const parts = basePlan.id.split('_');
-     return parts[0] as 'pax' | 'cargo' | 'mixed';
+     return parts.slice(0, 2).join('_') as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency';
   }, [basePlan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
@@ -59,7 +59,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     if (relevantItems.length === 0) {
       const emptyPlan: FlightPlan = {
         ...basePlan,
-        id: `${basePlan.id.split('_')[0]}_${basePlan.id.split('_')[1]}_${shift}`,
+        id: `${strategy}_${shift}`,
         steps: [],
         metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
       };
@@ -249,3 +249,5 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     </Card>
   );
 }
+
+    

@@ -7,8 +7,6 @@ import type { FlightPlan } from '@/lib/types';
 import { Wind } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
-import Image from 'next/image';
-import { useTheme } from 'next-themes';
 
 interface RouteMapProps {
   plan: FlightPlan;
@@ -36,8 +34,6 @@ const stationCoords: Record<number, Point> = {
 
 
 export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
-  const { resolvedTheme } = useTheme();
-
   const flightPath = useMemo(() => plan.steps.filter(s => s.action === 'TRAVEL'), [plan]);
 
   const helicopterPosition = useMemo(() => {
@@ -50,24 +46,16 @@ export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
     return stationCoords[endStationId] || stationCoords[0];
   }, [currentStep, flightPath]);
 
+  // Reset step to 0 when the plan changes
   useEffect(() => {
     onStepChange(0);
-  }, [plan, onStepChange]);
-
-  const mapImageSrc = resolvedTheme === 'dark' ? '/map-dark.png' : '/map-light.png';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id]);
 
   return (
     <Card className="flex flex-col">
       <CardContent className="flex-1 flex flex-col items-center gap-6 p-4">
-        <div className="relative w-full aspect-[4/3]">
-           <Image
-            src={mapImageSrc}
-            alt="Mapa de fondo"
-            layout="fill"
-            objectFit="cover"
-            className="rounded-lg z-0"
-            data-ai-hint="map schematic"
-          />
+        <div className="relative w-full aspect-[4/3] bg-muted/20 rounded-lg">
           <svg viewBox="0 0 800 600" className="relative z-10 w-full h-full">
             <defs>
               <marker
@@ -151,7 +139,7 @@ export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
               className="transition-transform duration-500 ease-in-out" 
               transform={`translate(${helicopterPosition.x}, ${helicopterPosition.y})`}
             >
-                <Wind className="h-10 w-10 text-primary drop-shadow-lg -translate-x-1/2 -translate-y-1/2" />
+                <Wind className="h-10 w-10 text-primary drop-shadow-lg -translate-x-5 -translate-y-5" />
             </g>
           </svg>
         </div>
@@ -176,3 +164,5 @@ export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
     </Card>
   );
 }
+
+    

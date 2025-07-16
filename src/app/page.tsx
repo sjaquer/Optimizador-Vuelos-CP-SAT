@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import {
   SidebarProvider,
@@ -71,12 +71,13 @@ export default function Home() {
     setTimeout(() => {
       try {
         const initialPlans: FlightPlan[] = [
-            { id: 'pax_priority', title: 'Plan A: Prioridad Pasajeros (PAX)', description: 'Optimiza la ruta para entregar a los pasajeros lo más rápido posible, especialmente los de alta prioridad.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_priority', title: 'Plan B: Prioridad Carga', description: 'Da preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'mixed_efficiency', title: 'Plan C: Eficiencia Mixta', description: 'Busca la ruta más corta para entregar todos los ítems (PAX y Carga), ideal para ahorrar combustible.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_priority', title: 'Propuesta A: Eficiencia con Prioridad PAX', description: 'Optimiza la ruta dando preferencia a los pasajeros, ideal para traslados urgentes de personal.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_priority', title: 'Propuesta B: Eficiencia con Prioridad Carga', description: 'Busca la eficiencia dando preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'mixed_efficiency', title: 'Propuesta C: Eficiencia de Ruta Pura', description: 'Busca la ruta más corta para entregar todos los ítems (PAX y Carga), ideal para ahorrar combustible y tiempo total.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
         ];
         
         setGeneratedPlans(initialPlans);
+        setSelectedPlanId(initialPlans[0].id); // Automatically select the first plan
         
         saveScenarioToHistory(scenario);
          toast({
@@ -160,7 +161,7 @@ export default function Home() {
 
   const handlePlanUpdate = (plan: FlightPlan) => {
     setGeneratedPlans(currentPlans => {
-        const index = currentPlans.findIndex(cp => cp.id === plan.id);
+        const index = currentPlans.findIndex(cp => cp.id.startsWith(plan.id.split('_').slice(0, 2).join('_')));
         if (index !== -1) {
             const newPlans = [...currentPlans];
             newPlans[index] = plan;
@@ -174,16 +175,18 @@ export default function Home() {
     setSelectedPlanId(planId);
     const plan = generatedPlans.find(p => p.id === planId);
     if (plan && plan.steps.length > 0) {
-      setActiveView('map');
       setCurrentMapStep(0);
-    } else if (plan) {
-      toast({
-        variant: 'default',
-        title: 'Plan sin ruta',
-        description: 'Este plan no tiene una ruta generada para visualizar.',
-      });
     }
   }
+
+  useEffect(() => {
+    if (selectedPlanId) {
+      const plan = generatedPlans.find(p => p.id === selectedPlanId);
+      if (plan && plan.steps.length === 0) {
+        setActiveView('plans');
+      }
+    }
+  }, [selectedPlanId, generatedPlans]);
   
   return (
     <SidebarProvider>
@@ -231,7 +234,7 @@ export default function Home() {
                 {activeView === 'plans' ? (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Planes de Vuelo Mixtos</h2>
+                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Propuestas de Vuelo Mixto</h2>
                       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                         {generatedPlans.map((plan) => (
                           <FlightPlanCard 
@@ -313,3 +316,5 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
     </div>
   );
 }
+
+    
