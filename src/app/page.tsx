@@ -30,7 +30,7 @@ import {
 
 export default function Home() {
   const [scenario, setScenario] = useState<ScenarioData>({
-    numStations: 6,
+    numStations: 8,
     helicopterCapacity: 4,
     helicopterMaxWeight: 500,
     transportItems: [],
@@ -65,12 +65,12 @@ export default function Home() {
     setTimeout(() => {
       try {
         setGeneratedPlans([
-            { id: 'pax_priority', title: 'Plan A: Prioridad', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_efficiency', title: 'Plan B: Eficiencia', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_segments', title: 'Plan C: Segmentos', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_priority', title: 'Plan D: Prioridad', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_efficiency', title: 'Plan E: Eficiencia', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_segments', title: 'Plan F: Segmentos', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_priority', title: 'Plan A: Prioridad', description: 'Entrega los ítems de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_efficiency', title: 'Plan B: Eficiencia', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_segments', title: 'Plan C: Segmentos', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_priority', title: 'Plan D: Prioridad Carga', description: 'Entrega la carga de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_efficiency', title: 'Plan E: Eficiencia Carga', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_segments', title: 'Plan F: Segmentos Carga', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
         ]);
         
         saveScenarioToHistory(scenario);
@@ -109,7 +109,7 @@ export default function Home() {
         const configSheet = workbook.Sheets['Configuracion'];
         if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
         const configData = XLSX.utils.sheet_to_json<{ Clave: string; Valor: any }>(configSheet);
-        const numStations = configData.find(row => row.Clave === 'numStations')?.Valor;
+        const numStations = configData.find(row => row.Clave === 'numStations')?.Valor ?? 8;
         const helicopterCapacity = configData.find(row => row.Clave === 'helicopterCapacity')?.Valor;
         const helicopterMaxWeight = configData.find(row => row.Clave === 'helicopterMaxWeight')?.Valor;
         if (numStations === undefined || helicopterCapacity === undefined || helicopterMaxWeight === undefined) throw new Error("Formato de 'Configuracion' incorrecto. Faltan numStations, helicopterCapacity o helicopterMaxWeight.");
@@ -126,7 +126,7 @@ export default function Home() {
           priority: item.prioridad,
           originStation: item.origen,
           destinationStation: item.destino,
-          weight: item.tipo === 'PAX' ? (item.peso ?? 80) : item.peso,
+          weight: item.tipo === 'PAX' ? (item.peso ?? 80) : (item.peso ?? 0),
           description: item.descripcion || '',
         }));
         

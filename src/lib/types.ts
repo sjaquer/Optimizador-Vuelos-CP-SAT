@@ -21,6 +21,7 @@ export interface FlightStep {
 export interface FlightPlan {
   id: string;
   title: string;
+  description?: string;
   steps: FlightStep[];
   metrics: {
     totalStops: number;

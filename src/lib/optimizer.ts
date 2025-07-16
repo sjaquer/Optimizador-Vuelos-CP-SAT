@@ -3,29 +3,23 @@ import type { TransportItem, FlightPlan, FlightStep, ScenarioData } from './type
 
 const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
-const stationCoords: Record<number, { x: number; y: number }> = {};
-let numStationsGlobal = 0;
-
-function initializeCoords(numStations: number) {
-    if (numStations === numStationsGlobal && Object.keys(stationCoords).length > 0) {
-        return;
-    }
-    numStationsGlobal = numStations;
-    stationCoords[0] = { x: 0, y: 0 };
-    const radius = 100;
-    for (let i = 1; i <= numStations; i++) {
-        const angle = (i - 1) * (2 * Math.PI / numStations) - Math.PI / 2;
-        stationCoords[i] = {
-            x: radius * Math.cos(angle),
-            y: radius * Math.sin(angle),
-        };
-    }
-}
+const stationCoords: Record<number, { x: number; y: number }> = {
+  0: { x: 450, y: 350 },
+  1: { x: 400, y: 250 },
+  2: { x: 300, y: 300 },
+  3: { x: 250, y: 150 },
+  4: { x: 100, y: 200 },
+  5: { x: 80, y: 100 },
+  6: { x: 700, y: 500 },
+  7: { x: 550, y: 80 },
+  8: { x: 180, y: 450 },
+};
 
 const getDistance = (from: number, to: number): number => {
     const fromCoord = stationCoords[from];
     const toCoord = stationCoords[to];
     if (!fromCoord || !toCoord) return Infinity;
+    // Using simple integer distance for simulation, not real-world units
     return Math.round(Math.sqrt(Math.pow(toCoord.x - fromCoord.x, 2) + Math.pow(toCoord.y - fromCoord.y, 2)));
 };
 
@@ -35,14 +29,11 @@ const getNextClosestStation = (from: number, availableStations: number[]): numbe
 };
 
 export function runFlightSimulation(
-    idPrefix: string,
-    titlePrefix: string,
+    basePlan: FlightPlan,
     itemsToTransport: TransportItem[],
     scenario: ScenarioData,
-    strategy: 'priority' | 'efficiency' | 'segments',
     shift: 'M' | 'T'
 ): FlightPlan {
-    initializeCoords(scenario.numStations);
     const itemsToPickup = deepCopy(itemsToTransport);
     let itemsInHelicopter: TransportItem[] = [];
     const steps: FlightStep[] = [];
@@ -50,6 +41,8 @@ export function runFlightSimulation(
     let itemsDelivered = 0;
     let totalWeightTransported = 0;
     let maxWeightRatio = 0;
+    
+    const strategy = basePlan.id.split('_')[1] as 'priority' | 'efficiency' | 'segments';
 
     const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + item.weight, 0);
 
@@ -123,12 +116,12 @@ export function runFlightSimulation(
         }
 
         if (nextStation !== -1 && currentStation !== nextStation) {
-            steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
+            steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de E-${currentStation} a E-${nextStation}` });
             currentStation = nextStation;
         } else if (itemsInHelicopter.length > 0 && availableDropoffStations.length > 0) {
              nextStation = getNextClosestStation(currentStation, availableDropoffStations.filter(s => s !== currentStation));
              if(nextStation !== -1 && currentStation !== nextStation) {
-                steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
+                steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de E-${currentStation} a E-${nextStation}` });
                 currentStation = nextStation;
              } else {
                 break;
@@ -143,8 +136,8 @@ export function runFlightSimulation(
     }
 
     return {
-        id: `${idPrefix}_${strategy}_${shift}`,
-        title: `${titlePrefix}: ${strategy.charAt(0).toUpperCase() + strategy.slice(1)}`,
+        ...basePlan,
+        id: `${basePlan.id.split('_').slice(0, 2).join('_')}_${shift}`,
         steps,
         metrics: {
             totalStops: new Set(steps.filter(s => s.action !== 'TRAVEL').map(s => s.station)).size,

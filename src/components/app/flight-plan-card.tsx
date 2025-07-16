@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { FlightPlan, TransportItem, ScenarioData, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale, Star } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { runFlightSimulation } from '@/lib/optimizer';
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -58,7 +58,7 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
     const relevantItems = scenario.transportItems.filter(item => item.type === itemType && item.shift === shift);
     
     if (relevantItems.length === 0) {
-      const emptyPlan = {
+      const emptyPlan: FlightPlan = {
         ...basePlan,
         id: `${itemType.toLowerCase()}_${strategy}_${shift}`,
         steps: [],
@@ -70,14 +70,12 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
       return;
     }
 
-    const idPrefix = itemType.toLowerCase();
-    const titlePrefix = basePlan.title.split(':')[0];
-    
-    const newPlan = runFlightSimulation(idPrefix, titlePrefix, relevantItems, scenario, strategy, shift);
+    const newPlan = runFlightSimulation(basePlan, relevantItems, scenario, shift);
     setCurrentPlan(newPlan);
     onPlanUpdate(newPlan);
     setIsLoading(false);
-  }, [scenario, itemType, basePlan, strategy, onPlanUpdate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario, itemType, basePlan, strategy]); // onPlanUpdate is removed intentionally
   
   useEffect(() => {
     generatePlanForShift(activeShift);
@@ -179,7 +177,10 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
     <Card className={cn("flex h-full flex-col transition-all", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={() => onSelectPlan(currentPlan)}>
       <CardHeader>
         <div className='flex items-start justify-between gap-4'>
-            <CardTitle className='text-xl'>{currentPlan.title}</CardTitle>
+            <div className='flex-1'>
+              <CardTitle className='text-xl'>{currentPlan.title}</CardTitle>
+              {currentPlan.description && <CardDescription className='mt-1'>{currentPlan.description}</CardDescription>}
+            </div>
             <div className='flex items-center gap-2'>
               <Select value={activeShift} onValueChange={handleShiftChange}>
                 <SelectTrigger className="w-[120px] h-9">
@@ -198,7 +199,7 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={exportToPDF}>Descargar PDF</DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportToExcel}>Descargar Excel</DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToExcel}>Descargar Excel (CSV)</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

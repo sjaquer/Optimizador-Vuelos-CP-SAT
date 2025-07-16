@@ -4,60 +4,51 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FlightPlan } from '@/lib/types';
-import { Map } from 'lucide-react';
+import { Map, Wind } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import Image from 'next/image';
 
 interface RouteMapProps {
   plan: FlightPlan;
-  numStations: number;
+  numStations: number; // Keep this prop for potential future use, though coords are now hardcoded
 }
 
 interface Point {
   x: number;
   y: number;
+  name: string;
 }
+
+// Hardcoded coordinates based on the provided image, scaled to a 800x600 viewbox
+const stationCoords: Record<number, Point> = {
+  0: { x: 450, y: 350, name: "BO Nuevo Mundo" },
+  1: { x: 400, y: 250, name: "HP 6+800" },
+  2: { x: 300, y: 300, name: "HP Kinteroni" },
+  3: { x: 250, y: 150, name: "HP CT-5" },
+  4: { x: 100, y: 200, name: "HP Sagari AX" },
+  5: { x: 80, y: 100, name: "HP Sagari BX" },
+  6: { x: 700, y: 500, name: "HP 14+000" },
+  7: { x: 550, y: 80, name: "HP Porotobango" },
+  8: { x: 180, y: 450, name: "HP Kitepampani" },
+};
 
 
 export function RouteMap({ plan, numStations }: RouteMapProps) {
   const [currentStep, setCurrentStep] = useState(0);
 
-  const { stationCoords } = useMemo(() => {
-    const width = 500;
-    const height = 500;
-    const center = { x: width / 2, y: height / 2 };
-    const radius = width / 2 - 40;
-
-    const sCoords: Record<number, Point> = {
-      0: center,
-    };
-
-    for (let i = 1; i <= numStations; i++) {
-      const angle = (i - 1) * (2 * Math.PI / numStations) - Math.PI / 2;
-      sCoords[i] = {
-        x: center.x + radius * Math.cos(angle),
-        y: center.y + radius * Math.sin(angle),
-      };
-    }
-    return { stationCoords: sCoords };
-  }, [numStations]);
-  
-  const flightPath = plan.steps.filter(s => s.action === 'TRAVEL');
+  const flightPath = useMemo(() => plan.steps.filter(s => s.action === 'TRAVEL'), [plan]);
 
   const helicopterPosition = useMemo(() => {
     if (flightPath.length === 0) {
-        return stationCoords[0];
+      return stationCoords[0];
     }
-    if (currentStep >= flightPath.length) {
-      return stationCoords[flightPath[flightPath.length - 1]?.station ?? 0];
-    }
-    const endStation = flightPath[currentStep].station;
+    const legIndex = Math.min(currentStep, flightPath.length - 1);
+    const endStationId = flightPath[legIndex]?.station ?? 0;
+    
+    return stationCoords[endStationId] || stationCoords[0];
+  }, [currentStep, flightPath]);
 
-    return stationCoords[endStation];
-  }, [currentStep, flightPath, stationCoords]);
-
-  // Reset step to 0 when plan changes
   useEffect(() => {
     setCurrentStep(0);
   }, [plan]);
@@ -72,8 +63,8 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-6">
-        <div className="relative w-full max-w-[500px]" data-ai-hint="map schematic">
-          <svg viewBox="0 0 500 500" className="rounded-lg border bg-card">
+        <div className="relative w-full max-w-[800px] aspect-[4/3]" data-ai-hint="map schematic">
+          <svg viewBox="0 0 800 600" className="rounded-lg border bg-card">
             <defs>
               <marker
                 id="arrowhead"
@@ -87,12 +78,11 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
               </marker>
             </defs>
 
-            {/* Render full path faintly */}
             {flightPath.map((leg, index) => {
-              const startStation = index > 0 ? flightPath[index-1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
-              const endStation = leg.station;
-              const start = stationCoords[startStation];
-              const end = stationCoords[endStation];
+              const startStationId = index > 0 ? flightPath[index-1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
+              const endStationId = leg.station;
+              const start = stationCoords[startStationId];
+              const end = stationCoords[endStationId];
               if (!start || !end) return null;
               return (
                  <line
@@ -108,12 +98,11 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
               )
             })}
             
-            {/* Render active path */}
             {flightPath.slice(0, currentStep + 1).map((leg, index) => {
-              const startStation = index > 0 ? flightPath[index-1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
-              const endStation = leg.station;
-              const start = stationCoords[startStation];
-              const end = stationCoords[endStation];
+              const startStationId = index > 0 ? flightPath[index - 1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
+              const endStationId = leg.station;
+              const start = stationCoords[startStationId];
+              const end = stationCoords[endStationId];
               if (!start || !end) return null;
               
               const isCurrentLeg = index === currentStep;
@@ -134,38 +123,36 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
             
             {Object.entries(stationCoords).map(([id, coords]) => (
               <g key={id} transform={`translate(${coords.x}, ${coords.y})`}>
-                <circle
+                 <circle
                   cx="0"
                   cy="0"
-                  r={id === '0' ? '20' : '15'}
+                  r={id === '0' ? '12' : '10'}
                   className={id === '0' ? 'fill-primary' : 'fill-card stroke-primary'}
                   strokeWidth="2"
                 />
-                <text
-                  textAnchor="middle"
+                 <text
+                  x="15"
+                  textAnchor="start"
                   dy="0.3em"
-                  className={id === '0' ? 'fill-primary-foreground font-bold' : 'fill-primary font-semibold'}
+                  className={'fill-foreground font-semibold'}
                   fontSize="12"
                 >
-                  {id === '0' ? 'Base' : id}
+                  {id} {coords.name}
                 </text>
               </g>
             ))}
-            
           </svg>
-          {helicopterPosition && (
-              <div 
-                className="absolute transition-all duration-500 ease-in-out" 
-                style={{ 
-                  top: helicopterPosition.y - 20, 
-                  left: helicopterPosition.x - 20,
-                  width: 40,
-                  height: 40
-                }}
-              >
-                 <Image src="/images/helicopter.png" alt="Helicopter" width={40} height={40} className="drop-shadow-lg" />
-              </div>
-            )}
+          <div 
+            className="absolute transition-all duration-500 ease-in-out" 
+            style={{ 
+              top: helicopterPosition.y - 20, 
+              left: helicopterPosition.x - 20,
+              width: 40,
+              height: 40,
+            }}
+          >
+              <Wind className="h-10 w-10 text-primary drop-shadow-lg" />
+          </div>
         </div>
         {flightPath.length > 0 && (
           <div className="w-full max-w-lg space-y-4">
