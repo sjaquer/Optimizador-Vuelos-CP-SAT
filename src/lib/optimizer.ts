@@ -38,13 +38,13 @@ export function runFlightSimulation(
     let itemsInHelicopter: TransportItem[] = [];
     const steps: FlightStep[] = [];
     let currentStation = 0;
-    let itemsDelivered = 0;
     let totalWeightTransported = 0;
     let maxWeightRatio = 0;
     
     const strategy: 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' = basePlan.id.split('_').slice(0, 2).join('_') as any;
 
-    const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + item.weight, 0);
+    const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+    const getCurrentSeatCount = () => itemsInHelicopter.reduce((sum, item) => sum + (item.type === 'PAX' ? item.quantity : 1), 0);
     const getCurrentItemType = (): 'PAX' | 'CARGO' | null => itemsInHelicopter[0]?.type ?? null;
 
     while (itemsToPickup.length > 0 || itemsInHelicopter.length > 0) {
@@ -52,49 +52,48 @@ export function runFlightSimulation(
         const itemsToDrop = itemsInHelicopter.filter(p => p.destinationStation === currentStation);
         if (itemsToDrop.length > 0) {
             itemsInHelicopter = itemsInHelicopter.filter(p => !itemsToDrop.find(dp => dp.id === p.id));
-            itemsDelivered += itemsToDrop.length;
-            totalWeightTransported += itemsToDrop.reduce((sum, item) => sum + item.weight, 0);
-            steps.push({ action: 'DROPOFF', station: currentStation, items: itemsToDrop, notes: `Desembarque de ${itemsToDrop.length} item(s).` });
+            totalWeightTransported += itemsToDrop.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+            steps.push({ action: 'DROPOFF', station: currentStation, items: itemsToDrop, notes: `Desembarque de ${itemsToDrop.reduce((s,i) => s + i.quantity, 0)} item(s).` });
         }
 
-        // 2. Pick up - respecting new constraint
-        const capacityAvailable = scenario.helicopterCapacity - itemsInHelicopter.length;
+        // 2. Pick up - respecting new constraints
         const currentTypeInHeli = getCurrentItemType();
         
         // Determine what can be picked up. If heli is empty, can pick up anything.
         // If not empty, can only pick up more of the same type.
         const pickupableTypes = currentTypeInHeli ? [currentTypeInHeli] : ['PAX', 'CARGO'];
 
-        if (capacityAvailable > 0) {
-            // Sort available items based on strategy
-            const itemsAvailableAtStation = itemsToPickup
-                .filter(p => p.originStation === currentStation && pickupableTypes.includes(p.type))
-                .sort((a, b) => {
-                    if (strategy === 'pax_priority') {
-                        if (a.type !== b.type) return a.type === 'PAX' ? -1 : 1; // PAX first
-                    }
-                    if (strategy === 'cargo_priority') {
-                         if (a.type !== b.type) return a.type === 'CARGO' ? -1 : 1; // CARGO first
-                    }
-                    return a.priority - b.priority; // Then by priority
-                });
-
-            const pickedUp: TransportItem[] = [];
-            for (const item of itemsAvailableAtStation) {
-                 // Check if heli is empty OR if item type matches what's already inside
-                if ((itemsInHelicopter.length === 0 || item.type === getCurrentItemType()) &&
-                    itemsInHelicopter.length < scenario.helicopterCapacity &&
-                    (getCurrentWeight() + item.weight) <= scenario.helicopterMaxWeight)
-                {
-                    itemsInHelicopter.push(item);
-                    pickedUp.push(item);
-                    const index = itemsToPickup.findIndex(pp => pp.id === item.id);
-                    if (index > -1) itemsToPickup.splice(index, 1);
+        // Sort available items based on strategy
+        const itemsAvailableAtStation = itemsToPickup
+            .filter(p => p.originStation === currentStation && pickupableTypes.includes(p.type))
+            .sort((a, b) => {
+                if (strategy === 'pax_priority') {
+                    if (a.type !== b.type) return a.type === 'PAX' ? -1 : 1; // PAX first
                 }
+                if (strategy === 'cargo_priority') {
+                     if (a.type !== b.type) return a.type === 'CARGO' ? -1 : 1; // CARGO first
+                }
+                return a.priority - b.priority; // Then by priority
+            });
+
+        const pickedUp: TransportItem[] = [];
+        for (const item of itemsAvailableAtStation) {
+            const seatsAfterPickup = getCurrentSeatCount() + (item.type === 'PAX' ? item.quantity : 1);
+            const weightAfterPickup = getCurrentWeight() + (item.weight * item.quantity);
+
+            // Check if heli is empty OR if item type matches what's already inside
+            if ((itemsInHelicopter.length === 0 || item.type === getCurrentItemType()) &&
+                seatsAfterPickup <= scenario.helicopterCapacity &&
+                weightAfterPickup <= scenario.helicopterMaxWeight)
+            {
+                itemsInHelicopter.push(item);
+                pickedUp.push(item);
+                const index = itemsToPickup.findIndex(pp => pp.id === item.id);
+                if (index > -1) itemsToPickup.splice(index, 1);
             }
-            if (pickedUp.length > 0) {
-                steps.push({ action: 'PICKUP', station: currentStation, items: pickedUp, notes: `Embarque de ${pickedUp.length} item(s).` });
-            }
+        }
+        if (pickedUp.length > 0) {
+            steps.push({ action: 'PICKUP', station: currentStation, items: pickedUp, notes: `Embarque de ${pickedUp.reduce((s,i) => s + i.quantity, 0)} item(s).` });
         }
         
         maxWeightRatio = Math.max(maxWeightRatio, getCurrentWeight() / scenario.helicopterMaxWeight);
@@ -103,9 +102,8 @@ export function runFlightSimulation(
         if (itemsToPickup.length === 0 && itemsInHelicopter.length === 0) break;
 
         let nextStation = -1;
-        const currentHeliType = getCurrentItemType();
         
-        // If helicopter is full or has items, priority is to drop them off.
+        // If helicopter has items, priority is to drop them off.
         if (itemsInHelicopter.length > 0) {
             const dropoffStations = [...new Set(itemsInHelicopter.map(p => p.destinationStation))];
             nextStation = getNextClosestStation(currentStation, dropoffStations);
@@ -146,6 +144,8 @@ export function runFlightSimulation(
     if (currentStation !== 0) {
         steps.push({ action: 'TRAVEL', station: 0, items: [], notes: 'Regreso final a la base.' });
     }
+    
+    const itemsDelivered = steps.filter(s => s.action === 'DROPOFF').flatMap(s => s.items).reduce((sum, item) => sum + item.quantity, 0);
 
     return {
         ...basePlan,

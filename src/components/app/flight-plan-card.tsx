@@ -123,7 +123,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
         index + 1,
         getActionLabel(step.action),
         step.station === 0 ? 'Base' : `E-${step.station}`,
-        step.items.map(p => `${p.area}-${p.type} (P${p.priority}) / ${p.weight}kg`).join('\n'),
+        step.items.map(p => `${p.area}-${p.type} ${p.type === 'PAX' && p.quantity > 1 ? `(x${p.quantity})` : ''} / ${p.type === 'CARGO' ? `${p.weight}kg` : ''}`).join('\n'),
         step.notes
       ]),
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
@@ -132,10 +132,10 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   };
 
   const exportToExcel = () => {
-    const headers = ['Paso', 'Acción', 'Estación', 'Area', 'Tipo', 'Prioridad', 'Peso', 'Descripción', 'Notas'];
+    const headers = ['Paso', 'Acción', 'Estación', 'Area', 'Tipo', 'Cantidad', 'Prioridad', 'Peso', 'Descripción', 'Notas'];
     const rows = currentPlan.steps.flatMap((step, index) => {
         if (step.items.length === 0) {
-            return [[index + 1, getActionLabel(step.action), step.station === 0 ? 'Base' : `E-${step.station}`, '', '', '', '', '', step.notes]];
+            return [[index + 1, getActionLabel(step.action), step.station === 0 ? 'Base' : `E-${step.station}`, '', '', '', '', '', '', step.notes]];
         }
         return step.items.map(item => [
             index + 1,
@@ -143,6 +143,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
             step.station === 0 ? 'Base' : `E-${step.station}`,
             item.area,
             item.type,
+            item.quantity,
             item.priority,
             item.weight,
             item.description,
@@ -167,11 +168,12 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     const originLabel = item.originStation === 0 ? 'B' : item.originStation;
     const destLabel = item.destinationStation === 0 ? 'B' : item.destinationStation;
     const Icon = item.type === 'PAX' ? User : Package;
+    const quantityLabel = item.type === 'PAX' && item.quantity > 1 ? ` (x${item.quantity})` : '';
 
     return (
        <Badge variant="secondary" className="font-normal h-6">
           <Icon className="mr-1 h-3 w-3" />
-          {item.area}-{item.type} (P{item.priority})
+          {item.area}-{item.type}{quantityLabel} (P{item.priority})
           <span className='mx-1.5 text-muted-foreground/80 flex items-center gap-0.5'>
             {originLabel} <ArrowRight className='h-3 w-3'/> {destLabel}
           </span>
@@ -187,6 +189,30 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
         onSelectPlan(currentPlan.id);
     }
   }
+
+  const itemsDeliveredCount = useMemo(() => {
+    return currentPlan.steps
+      .filter(s => s.action === 'DROPOFF')
+      .flatMap(s => s.items)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  }, [currentPlan]);
+
+  const paxDeliveredCount = useMemo(() => {
+     return currentPlan.steps
+      .filter(s => s.action === 'DROPOFF')
+      .flatMap(s => s.items)
+      .filter(i => i.type === 'PAX')
+      .reduce((sum, item) => sum + item.quantity, 0);
+  }, [currentPlan]);
+
+  const cargoDeliveredCount = useMemo(() => {
+     return currentPlan.steps
+      .filter(s => s.action === 'DROPOFF')
+      .flatMap(s => s.items)
+      .filter(i => i.type === 'CARGO')
+      .reduce((sum, item) => sum + item.quantity, 0);
+  }, [currentPlan]);
+
 
   return (
     <Card className={cn("flex h-full flex-col transition-all cursor-pointer", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={handleSelection}>
@@ -223,8 +249,8 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{currentPlan.metrics.totalStops} Paradas</span></div>
               <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{currentPlan.metrics.totalDistance} Tramos</span></div>
-              {itemTypesInPlan.has('PAX') && <div className="flex items-center gap-1"><User className="h-4 w-4" /><span>{currentPlan.steps.flatMap(s => s.items).filter(i => i.type === 'PAX').length} PAX</span></div>}
-              {itemTypesInPlan.has('CARGO') && <div className="flex items-center gap-1"><Package className="h-4 w-4" /><span>{currentPlan.steps.flatMap(s => s.items).filter(i => i.type === 'CARGO').length} Cargas</span></div>}
+              {paxDeliveredCount > 0 && <div className="flex items-center gap-1"><User className="h-4 w-4" /><span>{paxDeliveredCount} PAX</span></div>}
+              {cargoDeliveredCount > 0 && <div className="flex items-center gap-1"><Package className="h-4 w-4" /><span>{cargoDeliveredCount} Cargas</span></div>}
               <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
             </div>
         )}

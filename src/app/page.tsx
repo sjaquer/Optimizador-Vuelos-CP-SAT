@@ -123,7 +123,7 @@ export default function Home() {
 
         const itemsSheet = workbook.Sheets['Items'];
         if (!itemsSheet) throw new Error("No se encontró la hoja 'Items'.");
-        const itemsData = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; origen: number; destino: number; peso?: number; descripcion?: string }>(itemsSheet);
+        const itemsData = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; cantidad?: number; origen: number; destino: number; peso?: number; descripcion?: string }>(itemsSheet);
 
         const transportItems: TransportItem[] = itemsData.map((item, index) => ({
           id: crypto.randomUUID(),
@@ -131,9 +131,10 @@ export default function Home() {
           type: item.tipo,
           shift: item.turno,
           priority: item.prioridad,
+          quantity: item.tipo === 'PAX' ? (item.cantidad ?? 1) : 1,
           originStation: item.origen,
           destinationStation: item.destino,
-          weight: item.tipo === 'PAX' ? (item.peso ?? 80) : (item.peso ?? 0),
+          weight: item.tipo === 'PAX' ? 80 : (item.peso ?? 0),
           description: item.descripcion || '',
         }));
         
@@ -165,7 +166,7 @@ export default function Home() {
       // The base ID is the part before the shift suffix (_M or _T)
       const baseId = updatedPlan.id.substring(0, updatedPlan.id.lastIndexOf('_'));
       
-      const index = currentPlans.findIndex(cp => cp.id === baseId);
+      const index = currentPlans.findIndex(cp => cp.id.startsWith(baseId));
       
       if (index !== -1) {
         const newPlans = [...currentPlans];
@@ -177,15 +178,16 @@ export default function Home() {
             steps: updatedPlan.steps,
             metrics: updatedPlan.metrics,
         };
+        
+        // If this updated plan is the currently selected one, reflect that.
+        if(selectedPlanId && selectedPlanId.startsWith(baseId)) {
+            setSelectedPlanId(updatedPlan.id);
+        }
+
         return newPlans;
       }
       return currentPlans;
     });
-
-    // If the updated plan is the currently selected one, it might now be possible to view the map.
-    if (selectedPlanId === updatedPlan.id && updatedPlan.steps.length > 0) {
-      // This is a good place to switch to map view if desired, or just let the button enable.
-    }
   };
 
 
@@ -196,6 +198,7 @@ export default function Home() {
       setActiveView('map');
       setCurrentMapStep(0);
     } else {
+      // If plan has no steps, stay on plans view. This might happen if a shift has no items.
       setActiveView('plans');
     }
   }

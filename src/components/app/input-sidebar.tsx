@@ -42,6 +42,7 @@ const transportItemSchema = z.object({
   type: z.enum(['PAX', 'CARGO']),
   shift: z.enum(['M', 'T']),
   priority: z.coerce.number().min(1).max(5),
+  quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
   originStation: z.coerce.number().min(0),
   destinationStation: z.coerce.number().min(0),
   weight: z.coerce.number().optional(), // Make optional
@@ -112,7 +113,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
             transportItems: values.transportItems.map(item => ({
                 ...item,
                 weight: item.type === 'PAX' ? 80 : item.weight!,
-                description: item.type === 'PAX' ? `Pasajero de ${item.area}`: item.description || ''
+                description: item.type === 'PAX' ? `Pasajero de ${item.area}`: item.description || '',
             }))
         };
         setScenario(processedValues);
@@ -154,8 +155,8 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                   size="icon"
                   className='h-7 w-7'
                   onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
-                  aria-label="Historial"
                   type="button"
+                  aria-label="Historial"
                 >
                   <History />
                 </Button>
@@ -221,7 +222,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                                         <FormLabel className="text-xs">Descripción</FormLabel>
                                         <FormControl>
                                             <Input 
-                                                placeholder={isPax ? 'Pasajero (auto)' : 'Carga Frágil...'} 
+                                                placeholder={isPax ? 'Grupo de pasajeros (auto)' : 'Carga Frágil...'} 
                                                 {...field} 
                                                 disabled={isPax}
                                                 value={isPax ? '' : field.value || ''}
@@ -230,34 +231,54 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                                     </FormItem> 
                                 )}
                             />
-                             <FormField 
-                                control={form.control} 
-                                name={`transportItems.${index}.weight`} 
-                                render={({ field }) => ( 
-                                    <FormItem>
-                                        <FormLabel className="text-xs">Peso (kg)</FormLabel>
-                                        <FormControl>
-                                            <Input 
-                                                type="number" 
-                                                {...field} 
-                                                disabled={isPax}
-                                                placeholder={isPax ? '80 (auto)' : '0'}
-                                                value={isPax ? '' : field.value || ''}
-                                            />
-                                        </FormControl>
-                                    </FormItem> 
-                                )}
-                            />
+                            <div className="grid grid-cols-2 gap-2">
+                               <FormField 
+                                  control={form.control} 
+                                  name={`transportItems.${index}.quantity`} 
+                                  render={({ field }) => ( 
+                                      <FormItem>
+                                          <FormLabel className="text-xs">{isPax ? "Cantidad" : "Cantidad"}</FormLabel>
+                                          <FormControl>
+                                              <Input 
+                                                  type="number" min="1"
+                                                  placeholder="1"
+                                                  {...field} 
+                                                  disabled={!isPax}
+                                                  value={isPax ? field.value || 1 : 1}
+                                              />
+                                          </FormControl>
+                                      </FormItem> 
+                                  )}
+                              />
+                               <FormField 
+                                  control={form.control} 
+                                  name={`transportItems.${index}.weight`} 
+                                  render={({ field }) => ( 
+                                      <FormItem>
+                                          <FormLabel className="text-xs">Peso (kg)</FormLabel>
+                                          <FormControl>
+                                              <Input 
+                                                  type="number" 
+                                                  {...field} 
+                                                  disabled={isPax}
+                                                  placeholder={isPax ? '80 (auto)' : '0'}
+                                                  value={isPax ? '' : field.value || ''}
+                                              />
+                                          </FormControl>
+                                      </FormItem> 
+                                  )}
+                              />
+                            </div>
                             <div className="flex items-center justify-center gap-2">
                                 <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => ( <FormItem className="flex-1"><FormLabel className="text-xs">Origen (0=B)</FormLabel><FormControl><Input type="number" min="0" max={maxStation} {...field} /></FormControl></FormItem> )}/>
                                 <ArrowRight className="mt-5 h-4 w-4 text-muted-foreground" />
                                 <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => ( <FormItem className="flex-1"><FormLabel className="text-xs">Destino (0=B)</FormLabel><FormControl><Input type="number" min="0" max={maxStation} {...field} /></FormControl></FormItem> )}/>
                             </div>
-                            <FormMessage>{form.formState.errors.transportItems?.[index]?.root?.message || form.formState.errors.transportItems?.[index]?.area?.message || form.formState.errors.transportItems?.[index]?.weight?.message}</FormMessage>
+                            <FormMessage>{form.formState.errors.transportItems?.[index]?.root?.message || form.formState.errors.transportItems?.[index]?.area?.message || form.formState.errors.transportItems?.[index]?.weight?.message || form.formState.errors.transportItems?.[index]?.quantity?.message}</FormMessage>
                           </div>
                         );
                       })}
-                      <Button type="button" variant="outline" className="w-full" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 3, originStation: 1, destinationStation: 0, weight: 80, description: '' })}>
+                      <Button type="button" variant="outline" className="w-full" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 3, quantity: 1, originStation: 1, destinationStation: 0, weight: 80, description: '' })}>
                         <Plus className="mr-2" /> Agregar Item
                       </Button>
                     </div>

@@ -5,6 +5,7 @@ export interface TransportItem {
   type: 'PAX' | 'CARGO';
   shift: 'M' | 'T'; // Mañana o Tarde
   priority: number;
+  quantity: number;
   originStation: number;
   destinationStation: number;
   weight: number;
