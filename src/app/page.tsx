@@ -69,6 +69,7 @@ export default function Home() {
     setIsLoading(true);
     setGeneratedPlans([]);
     setSelectedPlanId(null);
+    setActiveView('plans');
 
     setTimeout(() => {
       try {
@@ -174,6 +175,20 @@ export default function Home() {
         return currentPlans;
     });
   };
+
+  const handlePlanSelection = (plan: FlightPlan) => {
+    setSelectedPlanId(plan.id);
+    if (plan.steps.length > 0) {
+      setActiveView('map');
+      setCurrentMapStep(0);
+    } else {
+      toast({
+        variant: 'default',
+        title: 'Plan sin ruta',
+        description: 'Este plan no tiene una ruta generada para visualizar.',
+      });
+    }
+  }
   
   return (
     <SidebarProvider>
@@ -227,7 +242,7 @@ export default function Home() {
                           {passengerPlans.map((plan) => (
                             <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="PAX" 
                               onPlanUpdate={handlePlanUpdate}
-                              onSelectPlan={(p) => setSelectedPlanId(p.id)} 
+                              onSelectPlan={handlePlanSelection} 
                               isSelected={selectedPlanId === plan.id} />
                           ))}
                         </div>
@@ -240,7 +255,7 @@ export default function Home() {
                           {cargoPlans.map((plan) => (
                             <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="CARGO" 
                               onPlanUpdate={handlePlanUpdate}
-                              onSelectPlan={(p) => setSelectedPlanId(p.id)} 
+                              onSelectPlan={handlePlanSelection} 
                               isSelected={selectedPlanId === plan.id}/>
                           ))}
                         </div>
@@ -252,14 +267,17 @@ export default function Home() {
                     <div className='flex items-center gap-4'>
                       <span className='text-sm font-medium'>Visualizando:</span>
                        <Select value={selectedPlan.id} onValueChange={(planId) => {
-                          if (planId) setSelectedPlanId(planId);
+                          const newSelectedPlan = generatedPlans.find(p => p.id === planId);
+                          if (newSelectedPlan) {
+                            handlePlanSelection(newSelectedPlan);
+                          }
                         }}>
                           <SelectTrigger className="w-[320px]">
                             <SelectValue placeholder="Seleccionar un plan" />
                           </SelectTrigger>
                           <SelectContent>
-                             {passengerPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title}</SelectItem>)}
-                             {cargoPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title}</SelectItem>)}
+                             {passengerPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})</SelectItem>)}
+                             {cargoPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})</SelectItem>)}
                           </SelectContent>
                         </Select>
                     </div>
