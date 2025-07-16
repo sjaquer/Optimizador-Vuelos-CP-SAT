@@ -165,29 +165,24 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
   return (
     <>
-      <SidebarHeader>
-        <div className='flex items-center justify-between w-full'>
-         <div className="flex items-center gap-2 rounded-md bg-sidebar-accent p-1 group-data-[collapsible=icon]:hidden">
-            <Button
-              variant={'ghost'}
-              size="icon"
-              className='h-7 w-7'
-              onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
-              aria-label="Historial"
-            >
-              <History />
-            </Button>
-          </div>
-        </div>
-      </SidebarHeader>
-      
       <Form {...form}>
         <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
           <div className="flex-1 min-h-0">
              {activeView === 'editor' && (
-              <SidebarContent>
+              <SidebarContent className="group-data-[collapsible=icon]:hidden">
                 <ScrollArea className="h-full px-2">
                   <div className="group-data-[collapsible=icon]:hidden">
+                    <SidebarHeader>
+                      <Button
+                        variant={'ghost'}
+                        size="icon"
+                        className='h-7 w-7 self-end'
+                        onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
+                        aria-label="Historial"
+                      >
+                        <History />
+                      </Button>
+                    </SidebarHeader>
                     <SidebarGroup>
                       <SidebarGroupLabel>Condiciones del Vuelo</SidebarGroupLabel>
                       <SidebarGroupContent className="space-y-4">
@@ -347,6 +342,17 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
               <SidebarContent>
                   <ScrollArea className="h-full px-2">
                       <div className="group-data-[collapsible=icon]:hidden">
+                           <SidebarHeader>
+                              <Button
+                                variant={'ghost'}
+                                size="icon"
+                                className='h-7 w-7 self-end'
+                                onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
+                                aria-label="Editor"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-pen-line"><path d="m18 5-3-3H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M8 18h1"/><path d="M18.4 9.6a2 2 0 1 1 3 3L17 17l-4 1 1-4Z"/></svg>
+                              </Button>
+                           </SidebarHeader>
                           <SidebarGroup>
                               <SidebarGroupLabel>Historial de Escenarios</SidebarGroupLabel>
                               <SidebarGroupContent>
@@ -385,15 +391,14 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
             )}
           </div>
 
-          <SidebarFooter>
+          <SidebarFooter className="group-data-[collapsible=icon]:hidden">
             <SidebarMenuButton
               type="submit"
               disabled={isLoading}
               className="w-full"
-              tooltip="Generar Plan de Vuelo"
             >
               {isLoading ? <Wind className="animate-spin" /> : <Wind />}
-              <span className="group-data-[collapsible=icon]:hidden">Generar Plan de Vuelo</span>
+              <span>Generar Plan de Vuelo</span>
             </SidebarMenuButton>
           </SidebarFooter>
         </form>
