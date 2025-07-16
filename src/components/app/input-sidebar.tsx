@@ -169,7 +169,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
         <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
           <div className="flex-1 min-h-0">
              {activeView === 'editor' && (
-              <SidebarContent className="group-data-[collapsible=icon]:hidden flex-1 min-h-0">
+              <SidebarContent className="group-data-[collapsible=icon]:hidden flex-1">
                 <ScrollArea className="h-full px-2">
                   <div className="group-data-[collapsible=icon]:hidden">
                     <SidebarHeader>
@@ -396,9 +396,10 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
               type="submit"
               disabled={isLoading}
               className="w-full"
+              tooltip={{ content: "Generar Plan de Vuelo" }}
             >
               {isLoading ? <Wind className="animate-spin" /> : <Wind />}
-              <span>Generar Plan de Vuelo</span>
+              <span className="group-data-[collapsible=icon]:hidden">Generar Plan de Vuelo</span>
             </SidebarMenuButton>
           </SidebarFooter>
         </form>
