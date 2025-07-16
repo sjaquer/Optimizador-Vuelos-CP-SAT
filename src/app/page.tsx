@@ -54,9 +54,6 @@ export default function Home() {
     return generatedPlans.find(p => p.id === selectedPlanId) || null;
   }, [selectedPlanId, generatedPlans]);
 
-  const passengerPlans = useMemo(() => generatedPlans.filter(p => p.id.startsWith('pax')), [generatedPlans]);
-  const cargoPlans = useMemo(() => generatedPlans.filter(p => p.id.startsWith('cargo')), [generatedPlans]);
-
   const handleGeneratePlans = () => {
     if (scenario.transportItems.length === 0) {
         toast({
@@ -74,12 +71,9 @@ export default function Home() {
     setTimeout(() => {
       try {
         const initialPlans: FlightPlan[] = [
-            { id: 'pax_priority', title: 'Plan A: Prioridad (PAX)', description: 'Entrega los pasajeros de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_efficiency', title: 'Plan B: Eficiencia (PAX)', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_segments', title: 'Plan C: Segmentos (PAX)', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_priority', title: 'Plan D: Prioridad (Carga)', description: 'Entrega la carga de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_efficiency', title: 'Plan E: Eficiencia (Carga)', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_segments', title: 'Plan F: Segmentos (Carga)', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_priority', title: 'Plan A: Prioridad Pasajeros (PAX)', description: 'Optimiza la ruta para entregar a los pasajeros lo más rápido posible, especialmente los de alta prioridad.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_priority', title: 'Plan B: Prioridad Carga', description: 'Da preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'mixed_efficiency', title: 'Plan C: Eficiencia Mixta', description: 'Busca la ruta más corta para entregar todos los ítems (PAX y Carga), ideal para ahorrar combustible.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
         ];
         
         setGeneratedPlans(initialPlans);
@@ -236,32 +230,21 @@ export default function Home() {
                 </div>
                 {activeView === 'plans' ? (
                   <div className="space-y-8">
-                    {passengerPlans.length > 0 && (
-                      <div>
-                        <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Users /> Planes de Pasajeros (PAX)</h2>
-                        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                          {passengerPlans.map((plan) => (
-                            <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="PAX" 
-                              onPlanUpdate={handlePlanUpdate}
-                              onSelectPlan={() => setSelectedPlanId(plan.id)}
-                              isSelected={selectedPlanId === plan.id} />
-                          ))}
-                        </div>
+                    <div>
+                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Planes de Vuelo Mixtos</h2>
+                      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                        {generatedPlans.map((plan) => (
+                          <FlightPlanCard 
+                            key={plan.id} 
+                            basePlan={plan} 
+                            scenario={scenario} 
+                            onPlanUpdate={handlePlanUpdate}
+                            onSelectPlan={() => handlePlanSelection(plan.id)}
+                            isSelected={selectedPlanId === plan.id}
+                          />
+                        ))}
                       </div>
-                    )}
-                     {cargoPlans.length > 0 && (
-                      <div>
-                        <h2 className="text-2xl font-bold tracking-tight mb-4 mt-8 flex items-center gap-2"><Package /> Planes de Carga</h2>
-                         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                          {cargoPlans.map((plan) => (
-                            <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="CARGO" 
-                              onPlanUpdate={handlePlanUpdate}
-                              onSelectPlan={() => setSelectedPlanId(plan.id)}
-                              isSelected={selectedPlanId === plan.id}/>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 ) : selectedPlan && (
                   <div className='flex flex-col gap-6'>
@@ -272,8 +255,11 @@ export default function Home() {
                             <SelectValue placeholder="Seleccionar un plan" />
                           </SelectTrigger>
                           <SelectContent>
-                             {passengerPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})</SelectItem>)}
-                             {cargoPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})</SelectItem>)}
+                             {generatedPlans.filter(p => p.steps.length > 0).map((plan) => (
+                               <SelectItem key={plan.id} value={plan.id}>
+                                {plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})
+                               </SelectItem>
+                             ))}
                           </SelectContent>
                         </Select>
                     </div>

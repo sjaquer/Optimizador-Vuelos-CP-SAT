@@ -31,7 +31,6 @@ import { cn } from '@/lib/utils';
 interface FlightPlanCardProps {
   basePlan: FlightPlan;
   scenario: ScenarioData;
-  itemType: 'PAX' | 'CARGO';
   onPlanUpdate: (plan: FlightPlan) => void;
   onSelectPlan: () => void;
   isSelected: boolean;
@@ -43,24 +42,24 @@ const actionTranslations: Record<FlightStep['action'], string> = {
   TRAVEL: 'VIAJAR',
 };
 
-export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onSelectPlan, isSelected }: FlightPlanCardProps) {
+export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan, isSelected }: FlightPlanCardProps) {
   const [activeShift, setActiveShift] = useState<'M' | 'T'>('M');
   const [currentPlan, setCurrentPlan] = useState<FlightPlan>(basePlan);
   const [isLoading, setIsLoading] = useState(false);
 
   const strategy = useMemo(() => {
      const parts = basePlan.id.split('_');
-     return parts[1] as 'priority' | 'efficiency' | 'segments';
+     return parts[0] as 'pax' | 'cargo' | 'mixed';
   }, [basePlan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
     setIsLoading(true);
-    const relevantItems = scenario.transportItems.filter(item => item.type === itemType && item.shift === shift);
+    const relevantItems = scenario.transportItems.filter(item => item.shift === shift);
     
     if (relevantItems.length === 0) {
       const emptyPlan: FlightPlan = {
         ...basePlan,
-        id: `${itemType.toLowerCase()}_${strategy}_${shift}`,
+        id: `${basePlan.id.split('_')[0]}_${basePlan.id.split('_')[1]}_${shift}`,
         steps: [],
         metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
       };
@@ -75,12 +74,12 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
     onPlanUpdate(newPlan);
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario, itemType, basePlan, strategy]); // onPlanUpdate is removed intentionally
+  }, [scenario, basePlan, strategy]); // onPlanUpdate is removed intentionally
   
   useEffect(() => {
     generatePlanForShift(activeShift);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario, itemType, basePlan.id]); // Removed generatePlanForShift from deps to avoid re-running on every render
+  }, [scenario, basePlan.id]); // Removed generatePlanForShift from deps to avoid re-running on every render
 
 
   const handleShiftChange = (shift: 'M' | 'T') => {
@@ -172,6 +171,7 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
   }
   
   const hasContent = currentPlan.steps.length > 0;
+  const itemTypesInPlan = useMemo(() => new Set(currentPlan.steps.flatMap(s => s.items).map(i => i.type)), [currentPlan]);
 
   return (
     <Card className={cn("flex h-full flex-col transition-all cursor-pointer", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={onSelectPlan}>
@@ -208,7 +208,8 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{currentPlan.metrics.totalStops} Paradas</span></div>
               <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{currentPlan.metrics.totalDistance} Tramos</span></div>
-              <div className="flex items-center gap-1">{itemType === 'PAX' ? <User className="h-4 w-4" /> : <Package className="h-4 w-4" />}<span>{currentPlan.metrics.itemsTransported} Items</span></div>
+              {itemTypesInPlan.has('PAX') && <div className="flex items-center gap-1"><User className="h-4 w-4" /><span>{currentPlan.steps.flatMap(s => s.items).filter(i => i.type === 'PAX').length} PAX</span></div>}
+              {itemTypesInPlan.has('CARGO') && <div className="flex items-center gap-1"><Package className="h-4 w-4" /><span>{currentPlan.steps.flatMap(s => s.items).filter(i => i.type === 'CARGO').length} Cargas</span></div>}
               <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
             </div>
         )}
@@ -220,7 +221,7 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
              <div className='flex flex-col items-center justify-center h-full text-center p-4'>
                 <AlertTriangle className='h-10 w-10 text-muted-foreground/50 mb-2' />
                 <p className='font-medium'>Sin datos para este turno</p>
-                <p className='text-sm text-muted-foreground'>No hay {itemType === 'PAX' ? 'pasajeros' : 'cargas'} para el turno de la {activeShift === 'M' ? 'mañana' : 'tarde'}.</p>
+                <p className='text-sm text-muted-foreground'>No hay items para el turno de la {activeShift === 'M' ? 'mañana' : 'tarde'}.</p>
              </div>
           ) : (
           <Table>

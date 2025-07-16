@@ -42,9 +42,10 @@ export function runFlightSimulation(
     let totalWeightTransported = 0;
     let maxWeightRatio = 0;
     
-    const strategy = basePlan.id.split('_')[1] as 'priority' | 'efficiency' | 'segments';
+    const strategy: 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' = basePlan.id.split('_').slice(0, 2).join('_') as any;
 
     const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + item.weight, 0);
+    const getCurrentItemType = (): 'PAX' | 'CARGO' | null => itemsInHelicopter[0]?.type ?? null;
 
     while (itemsToPickup.length > 0 || itemsInHelicopter.length > 0) {
         // 1. Drop off
@@ -56,22 +57,39 @@ export function runFlightSimulation(
             steps.push({ action: 'DROPOFF', station: currentStation, items: itemsToDrop, notes: `Desembarque de ${itemsToDrop.length} item(s).` });
         }
 
-        // 2. Pick up
+        // 2. Pick up - respecting new constraint
         const capacityAvailable = scenario.helicopterCapacity - itemsInHelicopter.length;
+        const currentTypeInHeli = getCurrentItemType();
+        
+        // Determine what can be picked up. If heli is empty, can pick up anything.
+        // If not empty, can only pick up more of the same type.
+        const pickupableTypes = currentTypeInHeli ? [currentTypeInHeli] : ['PAX', 'CARGO'];
+
         if (capacityAvailable > 0) {
+            // Sort available items based on strategy
             const itemsAvailableAtStation = itemsToPickup
-                .filter(p => p.originStation === currentStation)
-                .sort((a, b) => a.priority - b.priority);
+                .filter(p => p.originStation === currentStation && pickupableTypes.includes(p.type))
+                .sort((a, b) => {
+                    if (strategy === 'pax_priority') {
+                        if (a.type !== b.type) return a.type === 'PAX' ? -1 : 1; // PAX first
+                    }
+                    if (strategy === 'cargo_priority') {
+                         if (a.type !== b.type) return a.type === 'CARGO' ? -1 : 1; // CARGO first
+                    }
+                    return a.priority - b.priority; // Then by priority
+                });
 
             const pickedUp: TransportItem[] = [];
             for (const item of itemsAvailableAtStation) {
-                if (itemsInHelicopter.length < scenario.helicopterCapacity && (getCurrentWeight() + item.weight) <= scenario.helicopterMaxWeight) {
+                 // Check if heli is empty OR if item type matches what's already inside
+                if ((itemsInHelicopter.length === 0 || item.type === getCurrentItemType()) &&
+                    itemsInHelicopter.length < scenario.helicopterCapacity &&
+                    (getCurrentWeight() + item.weight) <= scenario.helicopterMaxWeight)
+                {
                     itemsInHelicopter.push(item);
                     pickedUp.push(item);
                     const index = itemsToPickup.findIndex(pp => pp.id === item.id);
                     if (index > -1) itemsToPickup.splice(index, 1);
-                } else {
-                    break;
                 }
             }
             if (pickedUp.length > 0) {
@@ -84,50 +102,44 @@ export function runFlightSimulation(
         // 3. Decide next move
         if (itemsToPickup.length === 0 && itemsInHelicopter.length === 0) break;
 
-        const availablePickupStations = [...new Set(itemsToPickup.map(p => p.originStation))];
-        const availableDropoffStations = [...new Set(itemsInHelicopter.map(p => p.destinationStation))];
-        const allTargetStations = [...new Set([...availablePickupStations, ...availableDropoffStations])];
-
-        if (allTargetStations.length === 0) break;
-
         let nextStation = -1;
+        const currentHeliType = getCurrentItemType();
         
-        // Strategy-based decision
-        if (strategy === 'priority') {
-            const highPriorityPickup = itemsToPickup.sort((a,b) => a.priority - b.priority)[0]?.originStation;
-            const targetStations = [...new Set([...availableDropoffStations, highPriorityPickup].filter(s => s !== undefined))]
-            nextStation = getNextClosestStation(currentStation, targetStations.length > 0 ? targetStations : allTargetStations);
-        } else if (strategy === 'efficiency') {
-            if (itemsInHelicopter.length === scenario.helicopterCapacity && availableDropoffStations.length > 0) {
-                nextStation = getNextClosestStation(currentStation, availableDropoffStations);
-            } else {
-                nextStation = getNextClosestStation(currentStation, allTargetStations);
+        // If helicopter is full or has items, priority is to drop them off.
+        if (itemsInHelicopter.length > 0) {
+            const dropoffStations = [...new Set(itemsInHelicopter.map(p => p.destinationStation))];
+            nextStation = getNextClosestStation(currentStation, dropoffStations);
+        }
+
+        // If no drop-offs possible or heli is empty, decide what to pick up next.
+        if (nextStation === -1 && itemsToPickup.length > 0) {
+            let potentialPickups = itemsToPickup;
+            if (strategy === 'pax_priority') {
+                const paxItems = itemsToPickup.filter(i => i.type === 'PAX');
+                if (paxItems.length > 0) potentialPickups = paxItems;
+            } else if (strategy === 'cargo_priority') {
+                const cargoItems = itemsToPickup.filter(i => i.type === 'CARGO');
+                if (cargoItems.length > 0) potentialPickups = cargoItems;
             }
-        } else if (strategy === 'segments') {
-            if (itemsInHelicopter.length >= scenario.helicopterCapacity * 0.75 && availableDropoffStations.length > 0) {
-                nextStation = getNextClosestStation(currentStation, availableDropoffStations);
-            } else if (availablePickupStations.length > 0) {
-                const stationCounts = availablePickupStations.map(s => ({ station: s, count: itemsToPickup.filter(p => p.originStation === s).length, dist: getDistance(currentStation, s) }));
-                stationCounts.sort((a,b) => b.count - a.count || a.dist - b.dist);
-                nextStation = stationCounts[0].station;
-            } else {
-                nextStation = getNextClosestStation(currentStation, availableDropoffStations);
-            }
+            
+            const pickupStations = [...new Set(potentialPickups.map(p => p.originStation))];
+            nextStation = getNextClosestStation(currentStation, pickupStations);
         }
 
         if (nextStation !== -1 && currentStation !== nextStation) {
             steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de E-${currentStation} a E-${nextStation}` });
             currentStation = nextStation;
-        } else if (itemsInHelicopter.length > 0 && availableDropoffStations.length > 0) {
-             nextStation = getNextClosestStation(currentStation, availableDropoffStations.filter(s => s !== currentStation));
-             if(nextStation !== -1 && currentStation !== nextStation) {
-                steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de E-${currentStation} a E-${nextStation}` });
-                currentStation = nextStation;
+        } else if (itemsInHelicopter.length > 0) { // Failsafe to return to base if stuck
+             const dropoffStations = [...new Set(itemsInHelicopter.map(p => p.destinationStation))];
+             const finalAttemptStation = getNextClosestStation(currentStation, dropoffStations.filter(s => s !== currentStation));
+             if(finalAttemptStation !== -1) {
+                steps.push({ action: 'TRAVEL', station: finalAttemptStation, items: deepCopy(itemsInHelicopter), notes: `Volando de E-${currentStation} a E-${finalAttemptStation}` });
+                currentStation = finalAttemptStation;
              } else {
-                break;
+                 break;
              }
         } else {
-            break;
+            break; // No more moves
         }
     }
 
