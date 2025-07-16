@@ -1,12 +1,13 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { FlightPlan } from '@/lib/types';
 import { Map } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
+import Image from 'next/image';
 
 interface RouteMapProps {
   plan: FlightPlan;
@@ -16,33 +17,6 @@ interface RouteMapProps {
 interface Point {
   x: number;
   y: number;
-}
-
-function HelicopterIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10.2 2.6c.1.3.2.7.2 1.1v2.3"/>
-      <path d="M13.6 2.6c-.1.3-.2.7-.2 1.1v2.3"/>
-      <path d="M11.9 8.1V12h-2"/>
-      <path d="m5.9 8.1 1.4 1.4"/>
-      <path d="M21 12h-4.2c-.6 0-1.2.3-1.6.7L8 20"/>
-      <path d="m3.4 17.6 1.1-1.1"/>
-      <path d="M3 12h2.2c.6 0 1.2.3 1.6.7L12 20"/>
-      <path d="M12 8.1V6.9c0-.5-.4-1.2-1.2-1.2H8.4c-.8 0-1.2.7-1.2 1.2v1.2"/>
-      <path d="M21 12h.5a1.5 1.5 0 0 1 0 3H3"/>
-    </svg>
-  );
 }
 
 
@@ -107,9 +81,9 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
   }, [currentStep, flightPath, stationCoords]);
 
   // Reset step to 0 when plan changes
-  useState(() => {
+  useEffect(() => {
     setCurrentStep(0);
-  });
+  }, [plan]);
 
 
   return (
@@ -202,13 +176,20 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
               </g>
             ))}
             
-            {helicopterPosition && (
-              <g transform={`translate(${helicopterPosition.x}, ${helicopterPosition.y})`} className="transition-transform duration-500 ease-in-out">
-                 <HelicopterIcon className="h-8 w-8 -translate-x-4 -translate-y-10 text-accent-foreground fill-accent" />
-              </g>
-            )}
-
           </svg>
+          {helicopterPosition && (
+              <div 
+                className="absolute transition-all duration-500 ease-in-out" 
+                style={{ 
+                  top: helicopterPosition.y - 20, 
+                  left: helicopterPosition.x - 20,
+                  width: 40,
+                  height: 40
+                }}
+              >
+                 <Image src="/images/helicopter.png" alt="Helicopter" width={40} height={40} className="drop-shadow-lg" />
+              </div>
+            )}
         </div>
         {flightPath.length > 0 && (
           <div className="w-full max-w-lg space-y-4">

@@ -26,6 +26,7 @@ import { Bot, Map, ListCollapse, Wind, Upload, PlusCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
+import { ThemeToggle } from '@/components/app/theme-toggle';
 
 export default function Home() {
   const [scenario, setScenario] = useState<ScenarioData>({
@@ -192,7 +193,7 @@ export default function Home() {
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar collapsible="icon">
         <InputSidebar
           scenario={scenario}
           setScenario={setScenario}
@@ -204,19 +205,22 @@ export default function Home() {
         <div className="flex h-full flex-col">
           <header className="flex h-14 items-center justify-between border-b bg-card/50 px-4">
             <div className="flex items-center gap-4">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger />
             </div>
-            <Button variant="outline" size="sm" onClick={handleImportClick}>
-                <Upload className="mr-2 h-4 w-4" />
-                Importar desde Excel
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".xlsx, .xls"
-              className="hidden"
-            />
+            <div className='flex items-center gap-2'>
+              <Button variant="outline" size="sm" onClick={handleImportClick}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importar desde Excel
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".xlsx, .xls"
+                className="hidden"
+              />
+              <ThemeToggle />
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
             {isLoading && (
