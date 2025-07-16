@@ -19,12 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { FlightPlan, TransportItem, ScenarioData, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale, Star } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { runFlightSimulation } from '@/lib/optimizer';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { cn } from '@/lib/utils';
 
 
 interface FlightPlanCardProps {
@@ -32,6 +33,8 @@ interface FlightPlanCardProps {
   scenario: ScenarioData;
   itemType: 'PAX' | 'CARGO';
   onPlanUpdate: (plan: FlightPlan) => void;
+  onSelectPlan: (plan: FlightPlan) => void;
+  isSelected: boolean;
 }
 
 const actionTranslations: Record<FlightStep['action'], string> = {
@@ -40,7 +43,7 @@ const actionTranslations: Record<FlightStep['action'], string> = {
   TRAVEL: 'VIAJAR',
 };
 
-export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: FlightPlanCardProps) {
+export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onSelectPlan, isSelected }: FlightPlanCardProps) {
   const [activeShift, setActiveShift] = useState<'M' | 'T'>('M');
   const [currentPlan, setCurrentPlan] = useState<FlightPlan>(basePlan);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,16 +53,19 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: F
      return parts[1] as 'priority' | 'efficiency' | 'segments';
   }, [basePlan.id]);
 
-  useEffect(() => {
+  const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
     setIsLoading(true);
-    const relevantItems = scenario.transportItems.filter(item => item.type === itemType && item.shift === activeShift);
+    const relevantItems = scenario.transportItems.filter(item => item.type === itemType && item.shift === shift);
     
     if (relevantItems.length === 0) {
-      setCurrentPlan({
+      const emptyPlan = {
         ...basePlan,
+        id: `${itemType.toLowerCase()}_${strategy}_${shift}`,
         steps: [],
         metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
-      });
+      };
+      setCurrentPlan(emptyPlan);
+      onPlanUpdate(emptyPlan);
       setIsLoading(false);
       return;
     }
@@ -67,13 +73,22 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: F
     const idPrefix = itemType.toLowerCase();
     const titlePrefix = basePlan.title.split(':')[0];
     
-    const newPlan = runFlightSimulation(idPrefix, titlePrefix, relevantItems, scenario, strategy);
+    const newPlan = runFlightSimulation(idPrefix, titlePrefix, relevantItems, scenario, strategy, shift);
     setCurrentPlan(newPlan);
     onPlanUpdate(newPlan);
     setIsLoading(false);
+  }, [scenario, itemType, basePlan, strategy, onPlanUpdate]);
+  
+  useEffect(() => {
+    generatePlanForShift(activeShift);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario, itemType, basePlan.id]); // Removed generatePlanForShift from deps to avoid re-running on every render
 
-  }, [activeShift, scenario, itemType, basePlan, strategy, onPlanUpdate]);
 
+  const handleShiftChange = (shift: 'M' | 'T') => {
+    setActiveShift(shift);
+    generatePlanForShift(shift);
+  }
 
   const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
@@ -161,12 +176,12 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: F
   const hasContent = currentPlan.steps.length > 0;
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className={cn("flex h-full flex-col transition-all", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={() => onSelectPlan(currentPlan)}>
       <CardHeader>
         <div className='flex items-start justify-between gap-4'>
-            <CardTitle>{currentPlan.title}</CardTitle>
+            <CardTitle className='text-xl'>{currentPlan.title}</CardTitle>
             <div className='flex items-center gap-2'>
-              <Select value={activeShift} onValueChange={(v: 'M' | 'T') => setActiveShift(v)}>
+              <Select value={activeShift} onValueChange={handleShiftChange}>
                 <SelectTrigger className="w-[120px] h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -190,10 +205,10 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: F
         </div>
         {hasContent && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2"><Milestone className="h-4 w-4" /><span>{currentPlan.metrics.totalStops} Paradas</span></div>
-              <div className="flex items-center gap-2"><Wind className="h-4 w-4" /><span>{currentPlan.metrics.totalDistance} Tramos</span></div>
-              <div className="flex items-center gap-2">{itemType === 'PAX' ? <User className="h-4 w-4" /> : <Package className="h-4 w-4" />}<span>{currentPlan.metrics.itemsTransported} Items</span></div>
-              <div className="flex items-center gap-2"><Scale className="h-4 w-4" /><span>Peso Máx: {(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
+              <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{currentPlan.metrics.totalStops} Paradas</span></div>
+              <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{currentPlan.metrics.totalDistance} Tramos</span></div>
+              <div className="flex items-center gap-1">{itemType === 'PAX' ? <User className="h-4 w-4" /> : <Package className="h-4 w-4" />}<span>{currentPlan.metrics.itemsTransported} Items</span></div>
+              <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
             </div>
         )}
       </CardHeader>
@@ -208,7 +223,7 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: F
              </div>
           ) : (
           <Table>
-            <TableHeader className="sticky top-0 bg-card">
+            <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow><TableHead className="w-[80px]">Acción</TableHead><TableHead>Estación</TableHead><TableHead>Items</TableHead><TableHead>Notas</TableHead></TableRow>
             </TableHeader>
             <TableBody>

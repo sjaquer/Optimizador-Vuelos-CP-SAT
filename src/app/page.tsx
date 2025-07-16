@@ -64,9 +64,6 @@ export default function Home() {
 
     setTimeout(() => {
       try {
-        // We will generate the base plans here. The shift logic will be handled inside the card.
-        // For simplicity, we can pass a dummy set of plans or generate for a default shift.
-        // The card will be responsible for re-calculating on shift change.
         setGeneratedPlans([
             { id: 'pax_priority', title: 'Plan A: Prioridad', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
             { id: 'pax_efficiency', title: 'Plan B: Eficiencia', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
@@ -119,7 +116,7 @@ export default function Home() {
 
         const itemsSheet = workbook.Sheets['Items'];
         if (!itemsSheet) throw new Error("No se encontró la hoja 'Items'.");
-        const itemsData = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; origen: number; destino: number; peso: number; descripcion: string }>(itemsSheet);
+        const itemsData = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; origen: number; destino: number; peso?: number; descripcion?: string }>(itemsSheet);
 
         const transportItems: TransportItem[] = itemsData.map((item, index) => ({
           id: crypto.randomUUID(),
@@ -129,12 +126,12 @@ export default function Home() {
           priority: item.prioridad,
           originStation: item.origen,
           destinationStation: item.destino,
-          weight: item.peso,
-          description: item.descripcion,
+          weight: item.tipo === 'PAX' ? (item.peso ?? 80) : item.peso,
+          description: item.descripcion || '',
         }));
         
         if (transportItems.some(p => !p.area || !p.type || !p.shift || p.priority === undefined || p.originStation === undefined || p.destinationStation === undefined || p.weight === undefined)) {
-            throw new Error("La hoja 'Items' tiene filas con datos incompletos o incorrectos. Revisa que todas las columnas esten presentes.");
+            throw new Error("La hoja 'Items' tiene filas con datos incompletos o incorrectos. Revisa que todas las columnas esten presentes (peso y descripcion son opcionales para PAX).");
         }
 
         setScenario({ 
@@ -171,7 +168,7 @@ export default function Home() {
           <header className="flex h-14 items-center justify-between border-b bg-card/50 px-4">
              <div className="flex items-center gap-4">
               <SidebarTrigger />
-              <h1 className='font-semibold text-lg group-data-[collapsible=icon]:hidden'>OVH por sjaquer</h1>
+              <h1 className='font-semibold text-lg'>OVH por sjaquer - Optimización de Rutas</h1>
             </div>
             <div className='flex items-center gap-2'>
               <Button variant="outline" size="sm" onClick={handleImportClick}>
@@ -204,11 +201,17 @@ export default function Home() {
                     {passengerPlans.length > 0 && (
                       <div>
                         <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Users /> Planes de Pasajeros (PAX)</h2>
-                        <div className="grid gap-6 xl:grid-cols-2">
+                        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                           {passengerPlans.map((plan) => (
                             <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="PAX" onPlanUpdate={(p) => {
+                                 const currentPlans = [...generatedPlans];
+                                 const index = currentPlans.findIndex(cp => cp.id === p.id);
+                                 if (index !== -1) {
+                                     currentPlans[index] = p;
+                                     setGeneratedPlans(currentPlans);
+                                 }
                                  if(selectedPlan?.id === p.id) setSelectedPlan(p);
-                            }} />
+                            }} onSelectPlan={(p) => setSelectedPlan(p)} isSelected={selectedPlan?.id === plan.id} />
                           ))}
                         </div>
                       </div>
@@ -216,11 +219,17 @@ export default function Home() {
                      {cargoPlans.length > 0 && (
                       <div>
                         <h2 className="text-2xl font-bold tracking-tight mb-4 mt-8 flex items-center gap-2"><Package /> Planes de Carga</h2>
-                         <div className="grid gap-6 xl:grid-cols-2">
+                         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                           {cargoPlans.map((plan) => (
                             <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="CARGO" onPlanUpdate={(p) => {
+                                 const currentPlans = [...generatedPlans];
+                                 const index = currentPlans.findIndex(cp => cp.id === p.id);
+                                 if (index !== -1) {
+                                     currentPlans[index] = p;
+                                     setGeneratedPlans(currentPlans);
+                                 }
                                 if(selectedPlan?.id === p.id) setSelectedPlan(p);
-                            }}/>
+                            }} onSelectPlan={(p) => setSelectedPlan(p)} isSelected={selectedPlan?.id === plan.id}/>
                           ))}
                         </div>
                       </div>
@@ -230,13 +239,16 @@ export default function Home() {
                   <>
                     <div className='flex items-center gap-4'>
                       <span className='text-sm font-medium'>Visualizando:</span>
-                      <Select value={selectedPlan.id} onValueChange={(planId) => setSelectedPlan(generatedPlans.find(p => p.id === planId) || null)}>
+                       <Select value={selectedPlan.id} onValueChange={(planId) => {
+                          const newSelectedPlan = generatedPlans.find(p => p.id === planId);
+                          if(newSelectedPlan) setSelectedPlan(newSelectedPlan);
+                        }}>
                           <SelectTrigger className="w-[280px]">
                             <SelectValue placeholder="Seleccionar un plan" />
                           </SelectTrigger>
                           <SelectContent>
-                             {passengerPlans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title}</SelectItem>)}
-                             {cargoPlans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title}</SelectItem>)}
+                             {passengerPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (PAX)</SelectItem>)}
+                             {cargoPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (Carga)</SelectItem>)}
                           </SelectContent>
                         </Select>
                     </div>

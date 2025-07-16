@@ -39,7 +39,8 @@ export function runFlightSimulation(
     titlePrefix: string,
     itemsToTransport: TransportItem[],
     scenario: ScenarioData,
-    strategy: 'priority' | 'efficiency' | 'segments'
+    strategy: 'priority' | 'efficiency' | 'segments',
+    shift: 'M' | 'T'
 ): FlightPlan {
     initializeCoords(scenario.numStations);
     const itemsToPickup = deepCopy(itemsToTransport);
@@ -102,7 +103,7 @@ export function runFlightSimulation(
         if (strategy === 'priority') {
             const highPriorityPickup = itemsToPickup.sort((a,b) => a.priority - b.priority)[0]?.originStation;
             const targetStations = [...new Set([...availableDropoffStations, highPriorityPickup].filter(s => s !== undefined))]
-            nextStation = targetStations[0] ?? getNextClosestStation(currentStation, allTargetStations);
+            nextStation = getNextClosestStation(currentStation, targetStations.length > 0 ? targetStations : allTargetStations);
         } else if (strategy === 'efficiency') {
             if (itemsInHelicopter.length === scenario.helicopterCapacity && availableDropoffStations.length > 0) {
                 nextStation = getNextClosestStation(currentStation, availableDropoffStations);
@@ -124,8 +125,8 @@ export function runFlightSimulation(
         if (nextStation !== -1 && currentStation !== nextStation) {
             steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
             currentStation = nextStation;
-        } else if (itemsInHelicopter.length > 0) {
-             nextStation = getNextClosestStation(currentStation, availableDropoffStations);
+        } else if (itemsInHelicopter.length > 0 && availableDropoffStations.length > 0) {
+             nextStation = getNextClosestStation(currentStation, availableDropoffStations.filter(s => s !== currentStation));
              if(nextStation !== -1 && currentStation !== nextStation) {
                 steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
                 currentStation = nextStation;
@@ -142,7 +143,7 @@ export function runFlightSimulation(
     }
 
     return {
-        id: `${idPrefix}_${strategy}_${itemsToTransport[0]?.shift || 'all'}`,
+        id: `${idPrefix}_${strategy}_${shift}`,
         title: `${titlePrefix}: ${strategy.charAt(0).toUpperCase() + strategy.slice(1)}`,
         steps,
         metrics: {
