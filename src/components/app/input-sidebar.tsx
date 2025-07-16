@@ -169,9 +169,9 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       <SidebarHeader>
         <div className='flex items-center justify-between w-full'>
          <Logo />
-         <div className="flex items-center gap-2 rounded-md bg-sidebar-accent p-1">
+         <div className="flex items-center gap-2 rounded-md bg-sidebar-accent p-1 group-data-[collapsible=icon]:hidden">
             <Button
-              variant={activeView === 'history' ? 'secondary' : 'ghost'}
+              variant={'ghost'}
               size="icon"
               className='h-7 w-7'
               onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
