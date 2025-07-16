@@ -26,6 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StationLegend } from '@/components/app/station-legend';
+import { FlightManifest } from '@/components/app/flight-manifest';
 
 
 export default function Home() {
@@ -41,10 +43,16 @@ export default function Home() {
   const [generatedPlans, setGeneratedPlans] = useState<FlightPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeView, setActiveView] = useState('plans'); // 'plans' or 'map'
-  const [selectedPlan, setSelectedPlan] = useState<FlightPlan | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [currentMapStep, setCurrentMapStep] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  const selectedPlan = useMemo(() => {
+    if (!selectedPlanId) return null;
+    return generatedPlans.find(p => p.id === selectedPlanId) || null;
+  }, [selectedPlanId, generatedPlans]);
 
   const passengerPlans = useMemo(() => generatedPlans.filter(p => p.id.startsWith('pax')), [generatedPlans]);
   const cargoPlans = useMemo(() => generatedPlans.filter(p => p.id.startsWith('cargo')), [generatedPlans]);
@@ -60,18 +68,20 @@ export default function Home() {
     }
     setIsLoading(true);
     setGeneratedPlans([]);
-    setSelectedPlan(null);
+    setSelectedPlanId(null);
 
     setTimeout(() => {
       try {
-        setGeneratedPlans([
-            { id: 'pax_priority', title: 'Plan A: Prioridad', description: 'Entrega los ítems de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_efficiency', title: 'Plan B: Eficiencia', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_segments', title: 'Plan C: Segmentos', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_priority', title: 'Plan D: Prioridad Carga', description: 'Entrega la carga de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_efficiency', title: 'Plan E: Eficiencia Carga', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_segments', title: 'Plan F: Segmentos Carga', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-        ]);
+        const initialPlans: FlightPlan[] = [
+            { id: 'pax_priority', title: 'Plan A: Prioridad (PAX)', description: 'Entrega los pasajeros de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_efficiency', title: 'Plan B: Eficiencia (PAX)', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_segments', title: 'Plan C: Segmentos (PAX)', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_priority', title: 'Plan D: Prioridad (Carga)', description: 'Entrega la carga de mayor prioridad primero, ideal para urgencias.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_efficiency', title: 'Plan E: Eficiencia (Carga)', description: 'Minimiza la distancia total de vuelo para ahorrar combustible y tiempo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_segments', title: 'Plan F: Segmentos (Carga)', description: 'Optimiza la ruta para agrupar recogidas en estaciones cercanas.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+        ];
+        
+        setGeneratedPlans(initialPlans);
         
         saveScenarioToHistory(scenario);
          toast({
@@ -152,6 +162,18 @@ export default function Home() {
     };
     reader.readAsArrayBuffer(file);
   };
+
+  const handlePlanUpdate = (plan: FlightPlan) => {
+    setGeneratedPlans(currentPlans => {
+        const index = currentPlans.findIndex(cp => cp.id === plan.id);
+        if (index !== -1) {
+            const newPlans = [...currentPlans];
+            newPlans[index] = plan;
+            return newPlans;
+        }
+        return currentPlans;
+    });
+  };
   
   return (
     <SidebarProvider>
@@ -203,15 +225,10 @@ export default function Home() {
                         <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Users /> Planes de Pasajeros (PAX)</h2>
                         <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                           {passengerPlans.map((plan) => (
-                            <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="PAX" onPlanUpdate={(p) => {
-                                 const currentPlans = [...generatedPlans];
-                                 const index = currentPlans.findIndex(cp => cp.id === p.id);
-                                 if (index !== -1) {
-                                     currentPlans[index] = p;
-                                     setGeneratedPlans(currentPlans);
-                                 }
-                                 if(selectedPlan?.id === p.id) setSelectedPlan(p);
-                            }} onSelectPlan={(p) => setSelectedPlan(p)} isSelected={selectedPlan?.id === plan.id} />
+                            <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="PAX" 
+                              onPlanUpdate={handlePlanUpdate}
+                              onSelectPlan={(p) => setSelectedPlanId(p.id)} 
+                              isSelected={selectedPlanId === plan.id} />
                           ))}
                         </div>
                       </div>
@@ -221,39 +238,41 @@ export default function Home() {
                         <h2 className="text-2xl font-bold tracking-tight mb-4 mt-8 flex items-center gap-2"><Package /> Planes de Carga</h2>
                          <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                           {cargoPlans.map((plan) => (
-                            <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="CARGO" onPlanUpdate={(p) => {
-                                 const currentPlans = [...generatedPlans];
-                                 const index = currentPlans.findIndex(cp => cp.id === p.id);
-                                 if (index !== -1) {
-                                     currentPlans[index] = p;
-                                     setGeneratedPlans(currentPlans);
-                                 }
-                                if(selectedPlan?.id === p.id) setSelectedPlan(p);
-                            }} onSelectPlan={(p) => setSelectedPlan(p)} isSelected={selectedPlan?.id === plan.id}/>
+                            <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="CARGO" 
+                              onPlanUpdate={handlePlanUpdate}
+                              onSelectPlan={(p) => setSelectedPlanId(p.id)} 
+                              isSelected={selectedPlanId === plan.id}/>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
                 ) : selectedPlan && (
-                  <>
+                  <div className='flex flex-col gap-6'>
                     <div className='flex items-center gap-4'>
                       <span className='text-sm font-medium'>Visualizando:</span>
                        <Select value={selectedPlan.id} onValueChange={(planId) => {
-                          const newSelectedPlan = generatedPlans.find(p => p.id === planId);
-                          if(newSelectedPlan) setSelectedPlan(newSelectedPlan);
+                          if (planId) setSelectedPlanId(planId);
                         }}>
-                          <SelectTrigger className="w-[280px]">
+                          <SelectTrigger className="w-[320px]">
                             <SelectValue placeholder="Seleccionar un plan" />
                           </SelectTrigger>
                           <SelectContent>
-                             {passengerPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (PAX)</SelectItem>)}
-                             {cargoPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title} (Carga)</SelectItem>)}
+                             {passengerPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title}</SelectItem>)}
+                             {cargoPlans.filter(p => p.steps.length > 0).map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.title}</SelectItem>)}
                           </SelectContent>
                         </Select>
                     </div>
-                    <RouteMap plan={selectedPlan} numStations={scenario.numStations} />
-                  </>
+                    <div className='grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4'>
+                        <StationLegend />
+                        <RouteMap 
+                            plan={selectedPlan} 
+                            currentStep={currentMapStep}
+                            onStepChange={setCurrentMapStep}
+                        />
+                        <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
+                    </div>
+                  </div>
                 )}
               </div>
             )}

@@ -1,17 +1,19 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import type { FlightPlan } from '@/lib/types';
-import { Map, Wind } from 'lucide-react';
+import { Wind } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 interface RouteMapProps {
   plan: FlightPlan;
-  numStations: number; // Keep this prop for potential future use, though coords are now hardcoded
+  currentStep: number;
+  onStepChange: (step: number) => void;
 }
 
 interface Point {
@@ -20,7 +22,6 @@ interface Point {
   name: string;
 }
 
-// Hardcoded coordinates based on the provided image, scaled to a 800x600 viewbox
 const stationCoords: Record<number, Point> = {
   0: { x: 450, y: 350, name: "BO Nuevo Mundo" },
   1: { x: 400, y: 250, name: "HP 6+800" },
@@ -34,8 +35,8 @@ const stationCoords: Record<number, Point> = {
 };
 
 
-export function RouteMap({ plan, numStations }: RouteMapProps) {
-  const [currentStep, setCurrentStep] = useState(0);
+export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
+  const { resolvedTheme } = useTheme();
 
   const flightPath = useMemo(() => plan.steps.filter(s => s.action === 'TRAVEL'), [plan]);
 
@@ -50,21 +51,24 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
   }, [currentStep, flightPath]);
 
   useEffect(() => {
-    setCurrentStep(0);
-  }, [plan]);
+    onStepChange(0);
+  }, [plan, onStepChange]);
 
+  const mapImageSrc = resolvedTheme === 'dark' ? '/map-dark.png' : '/map-light.png';
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Map className="h-5 w-5" />
-          <span>Visualización de Ruta ({plan.title})</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center gap-6">
-        <div className="relative w-full max-w-[800px] aspect-[4/3]" data-ai-hint="map schematic">
-          <svg viewBox="0 0 800 600" className="rounded-lg border bg-card">
+    <Card className="flex flex-col">
+      <CardContent className="flex-1 flex flex-col items-center gap-6 p-4">
+        <div className="relative w-full aspect-[4/3]">
+           <Image
+            src={mapImageSrc}
+            alt="Mapa de fondo"
+            layout="fill"
+            objectFit="cover"
+            className="rounded-lg z-0"
+            data-ai-hint="map schematic"
+          />
+          <svg viewBox="0 0 800 600" className="relative z-10 w-full h-full">
             <defs>
               <marker
                 id="arrowhead"
@@ -91,7 +95,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
                     y1={start.y}
                     x2={end.x}
                     y2={end.y}
-                    className="stroke-muted/50"
+                    className="stroke-muted/50 dark:stroke-muted/30"
                     strokeWidth="2"
                     strokeDasharray="4"
                   />
@@ -127,45 +131,42 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
                   cx="0"
                   cy="0"
                   r={id === '0' ? '12' : '10'}
-                  className={id === '0' ? 'fill-primary' : 'fill-card stroke-primary'}
+                  className={id === '0' ? 'fill-primary stroke-primary-foreground' : 'fill-card stroke-primary'}
                   strokeWidth="2"
                 />
                  <text
-                  x="15"
-                  textAnchor="start"
+                  x="0"
+                  y="1"
+                  textAnchor="middle"
                   dy="0.3em"
-                  className={'fill-foreground font-semibold'}
+                  className={id === '0' ? 'fill-primary-foreground font-bold' : 'fill-primary font-bold'}
                   fontSize="12"
                 >
-                  {id} {coords.name}
+                  {id}
                 </text>
               </g>
             ))}
+
+            <g 
+              className="transition-transform duration-500 ease-in-out" 
+              transform={`translate(${helicopterPosition.x}, ${helicopterPosition.y})`}
+            >
+                <Wind className="h-10 w-10 text-primary drop-shadow-lg -translate-x-1/2 -translate-y-1/2" />
+            </g>
           </svg>
-          <div 
-            className="absolute transition-all duration-500 ease-in-out" 
-            style={{ 
-              top: helicopterPosition.y - 20, 
-              left: helicopterPosition.x - 20,
-              width: 40,
-              height: 40,
-            }}
-          >
-              <Wind className="h-10 w-10 text-primary drop-shadow-lg" />
-          </div>
         </div>
         {flightPath.length > 0 && (
-          <div className="w-full max-w-lg space-y-4">
+          <div className="w-full max-w-lg space-y-4 pt-4">
               <div className='flex justify-between items-center'>
                   <h4 className='font-medium'>Paso {currentStep + 1} de {flightPath.length}</h4>
                   <div className='flex gap-2'>
-                      <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.max(0, s-1))} disabled={currentStep === 0}>Anterior</Button>
-                      <Button variant="outline" size="sm" onClick={() => setCurrentStep(s => Math.min(flightPath.length - 1, s+1))} disabled={currentStep >= flightPath.length - 1}>Siguiente</Button>
+                      <Button variant="outline" size="sm" onClick={() => onStepChange(Math.max(0, currentStep-1))} disabled={currentStep === 0}>Anterior</Button>
+                      <Button variant="outline" size="sm" onClick={() => onStepChange(Math.min(flightPath.length - 1, currentStep+1))} disabled={currentStep >= flightPath.length - 1}>Siguiente</Button>
                   </div>
               </div>
             <Slider
               value={[currentStep]}
-              onValueChange={(value) => setCurrentStep(value[0])}
+              onValueChange={(value) => onStepChange(value[0])}
               max={flightPath.length - 1}
               step={1}
             />
