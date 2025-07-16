@@ -33,7 +33,7 @@ interface FlightPlanCardProps {
   scenario: ScenarioData;
   itemType: 'PAX' | 'CARGO';
   onPlanUpdate: (plan: FlightPlan) => void;
-  onSelectPlan: (plan: FlightPlan) => void;
+  onSelectPlan: () => void;
   isSelected: boolean;
 }
 
@@ -174,7 +174,7 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
   const hasContent = currentPlan.steps.length > 0;
 
   return (
-    <Card className={cn("flex h-full flex-col transition-all", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={() => onSelectPlan(currentPlan)}>
+    <Card className={cn("flex h-full flex-col transition-all cursor-pointer", isSelected ? 'border-primary ring-2 ring-primary' : 'border-border')} onClick={onSelectPlan}>
       <CardHeader>
         <div className='flex items-start justify-between gap-4'>
             <div className='flex-1'>
@@ -193,11 +193,11 @@ export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate, onS
               </Select>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="ghost" className='h-9 w-9' disabled={!hasContent}>
+                  <Button size="icon" variant="ghost" className='h-9 w-9' disabled={!hasContent} onClick={(e) => e.stopPropagation()}>
                     <FileDown className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenuItem onClick={exportToPDF}>Descargar PDF</DropdownMenuItem>
                   <DropdownMenuItem onClick={exportToExcel}>Descargar Excel (CSV)</DropdownMenuItem>
                 </DropdownMenuContent>

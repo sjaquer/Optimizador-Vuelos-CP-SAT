@@ -176,12 +176,13 @@ export default function Home() {
     });
   };
 
-  const handlePlanSelection = (plan: FlightPlan) => {
-    setSelectedPlanId(plan.id);
-    if (plan.steps.length > 0) {
+  const handlePlanSelection = (planId: string) => {
+    setSelectedPlanId(planId);
+    const plan = generatedPlans.find(p => p.id === planId);
+    if (plan && plan.steps.length > 0) {
       setActiveView('map');
       setCurrentMapStep(0);
-    } else {
+    } else if (plan) {
       toast({
         variant: 'default',
         title: 'Plan sin ruta',
@@ -242,7 +243,7 @@ export default function Home() {
                           {passengerPlans.map((plan) => (
                             <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="PAX" 
                               onPlanUpdate={handlePlanUpdate}
-                              onSelectPlan={handlePlanSelection} 
+                              onSelectPlan={() => setSelectedPlanId(plan.id)}
                               isSelected={selectedPlanId === plan.id} />
                           ))}
                         </div>
@@ -255,7 +256,7 @@ export default function Home() {
                           {cargoPlans.map((plan) => (
                             <FlightPlanCard key={plan.id} basePlan={plan} scenario={scenario} itemType="CARGO" 
                               onPlanUpdate={handlePlanUpdate}
-                              onSelectPlan={handlePlanSelection} 
+                              onSelectPlan={() => setSelectedPlanId(plan.id)}
                               isSelected={selectedPlanId === plan.id}/>
                           ))}
                         </div>
@@ -266,12 +267,7 @@ export default function Home() {
                   <div className='flex flex-col gap-6'>
                     <div className='flex items-center gap-4'>
                       <span className='text-sm font-medium'>Visualizando:</span>
-                       <Select value={selectedPlan.id} onValueChange={(planId) => {
-                          const newSelectedPlan = generatedPlans.find(p => p.id === planId);
-                          if (newSelectedPlan) {
-                            handlePlanSelection(newSelectedPlan);
-                          }
-                        }}>
+                       <Select value={selectedPlan.id} onValueChange={(planId) => handlePlanSelection(planId)}>
                           <SelectTrigger className="w-[320px]">
                             <SelectValue placeholder="Seleccionar un plan" />
                           </SelectTrigger>
