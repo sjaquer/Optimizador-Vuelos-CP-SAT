@@ -25,8 +25,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import type { ScenarioData, WeatherAnalysis } from '@/lib/types';
-import { Plus, Trash2, Wind, ArrowRight, History, PanelLeftOpen, CloudSun, AlertTriangle, Thermometer, Gauge, Droplets, Sun } from 'lucide-react';
+import type { ScenarioData } from '@/lib/types';
+import { Plus, Trash2, Wind, ArrowRight, History, PanelLeftOpen } from 'lucide-react';
 import { Logo } from './logo';
 import { useEffect, useState } from 'react';
 import { getHistory, deleteScenarioFromHistory } from '@/lib/history';
@@ -36,10 +36,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { getWeather } from '@/ai/flows/get-weather-flow';
-import { Card, CardContent } from '../ui/card';
-import { cn } from '@/lib/utils';
-import { Skeleton } from '../ui/skeleton';
+import { Textarea } from '../ui/textarea';
+
 
 const passengerSchema = z.object({
   id: z.string(),
@@ -53,7 +51,8 @@ const formSchema = z.object({
   numStations: z.coerce.number().min(1, 'Se requiere al menos una estación'),
   helicopterCapacity: z.coerce.number().min(1, 'La capacidad debe ser al menos 1'),
   passengers: z.array(passengerSchema),
-  weatherAnalysis: z.any().optional(),
+  weatherConditions: z.string().optional(),
+  operationalNotes: z.string().optional(),
 }).refine(data => {
     return data.passengers.every(p => p.originStation <= data.numStations && p.destinationStation <= data.numStations);
 }, { message: "La estación debe ser menor o igual al número de estaciones", path: ["passengers"] })
@@ -74,7 +73,6 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
   const { toast } = useToast();
   const [activeView, setActiveView] = useState('editor'); // 'editor' or 'history'
   const [history, setHistory] = useState<ScenarioData[]>([]);
-  const [isWeatherLoading, setWeatherLoading] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -82,7 +80,8 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       numStations: 6,
       helicopterCapacity: 4,
       passengers: [],
-      weatherAnalysis: undefined,
+      weatherConditions: '',
+      operationalNotes: '',
     },
   });
 
@@ -102,8 +101,9 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     form.reset({
       numStations: scenario.numStations,
       helicopterCapacity: scenario.helicopterCapacity,
-      weatherAnalysis: scenario.weatherAnalysis,
       passengers: transformedPassengers,
+      weatherConditions: scenario.weatherConditions,
+      operationalNotes: scenario.operationalNotes,
     });
   }, [scenario, form]);
 
@@ -147,29 +147,8 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       description: 'El escenario seleccionado ha sido eliminado del historial.',
     });
   }
-  
-  const handleGetWeather = async () => {
-    setWeatherLoading(true);
-    try {
-      const weatherResult = await getWeather({});
-      form.setValue('weatherAnalysis', weatherResult);
-      toast({
-        title: 'Pronóstico Obtenido',
-        description: 'Se ha actualizado el estado del tiempo.',
-      });
-    } catch(error) {
-       toast({
-        variant: "destructive",
-        title: "Error de Pronóstico",
-        description: error instanceof Error ? error.message : "No se pudo obtener la información meteorológica.",
-      });
-    } finally {
-      setWeatherLoading(false);
-    }
-  };
 
   const maxStation = form.watch('numStations');
-  const weatherAnalysis = form.watch('weatherAnalysis');
 
   useEffect(() => {
     fields.forEach((field, index) => {
@@ -223,11 +202,32 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                    <SidebarGroup>
                     <SidebarGroupLabel>Condiciones del Vuelo</SidebarGroupLabel>
                     <SidebarGroupContent className="space-y-4">
-                      <Button type="button" variant="outline" size="sm" onClick={handleGetWeather} disabled={isWeatherLoading} className="w-full">
-                        {isWeatherLoading ? <Wind className="mr-2 animate-spin" /> : <CloudSun className="mr-2" />}
-                        Obtener Pronóstico
-                      </Button>
-                      <WeatherDisplay analysis={weatherAnalysis} isLoading={isWeatherLoading} />
+                       <FormField
+                        control={form.control}
+                        name="weatherConditions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Condiciones Climáticas</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Ej: Viento 15km/h, visibilidad buena..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormField
+                        control={form.control}
+                        name="operationalNotes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notas Operacionales</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Ej: Priorizar carga frágil..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </SidebarGroupContent>
                   </SidebarGroup>
 
@@ -378,10 +378,11 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                                       </span>
                                   </AccordionTrigger>
                                   <AccordionContent className='space-y-4'>
-                                    <div className='text-xs text-muted-foreground space-y-1'>
+                                    <div className='text-xs text-muted-foreground space-y-2'>
                                       <p><strong>Pasajeros:</strong> {histScenario.passengers.length}</p>
                                       <p><strong>Estaciones:</strong> {histScenario.numStations}</p>
-                                      <p><strong>Clima:</strong> {histScenario.weatherAnalysis?.summary || 'N/A'}</p>
+                                      <p><strong>Clima:</strong> {histScenario.weatherConditions || 'N/A'}</p>
+                                      <p><strong>Notas:</strong> {histScenario.operationalNotes || 'N/A'}</p>
                                     </div>
                                     <div className='flex gap-2'>
                                       <Button size="sm" onClick={() => loadScenarioFromHistory(histScenario)} className="flex-1">Cargar</Button>
@@ -401,86 +402,4 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
       )}
     </>
   );
-}
-
-function WeatherDisplay({ analysis, isLoading }: { analysis?: WeatherAnalysis, isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-3 space-y-2">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <div className="flex justify-between pt-2">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (!analysis) {
-    return (
-      <div className="text-center text-sm text-muted-foreground py-4">
-        Presiona el botón para obtener el último pronóstico.
-      </div>
-    );
-  }
-
-  const riskColor =
-    analysis.riskLevel === 'Alto' ? 'text-destructive' :
-    analysis.riskLevel === 'Medio' ? 'text-yellow-500' :
-    'text-green-500';
-
-  return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className={cn("h-5 w-5", riskColor)} />
-            <h4 className="font-semibold">Nivel de Riesgo: <span className={riskColor}>{analysis.riskLevel}</span></h4>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">{analysis.summary}</p>
-        </div>
-        <Separator/>
-        <div className="grid grid-cols-4 gap-2 text-center text-xs">
-          <div className='flex flex-col items-center gap-1'>
-            <Thermometer className='h-5 w-5 text-primary'/>
-            <span className='font-bold'>{analysis.details.temperature}°C</span>
-            <span className='text-muted-foreground'>Temp.</span>
-          </div>
-          <div className='flex flex-col items-center gap-1'>
-            <Wind className='h-5 w-5 text-primary'/>
-            <span className='font-bold'>{analysis.details.windSpeed} km/h</span>
-            <span className='text-muted-foreground'>Viento</span>
-          </div>
-           <div className='flex flex-col items-center gap-1'>
-            <Droplets className='h-5 w-5 text-primary'/>
-            <span className='font-bold'>{analysis.details.precipitation}%</span>
-            <span className='text-muted-foreground'>Lluvia</span>
-          </div>
-           <div className='flex flex-col items-center gap-1'>
-            <Sun className='h-5 w-5 text-primary'/>
-            <span className='font-bold'>{getWeatherCondition(analysis.details.weatherCode)}</span>
-            <span className='text-muted-foreground'>Estado</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function getWeatherCondition(code: number): string {
-    // WMO Weather interpretation codes
-    const conditions: Record<number, string> = {
-        0: 'Despejado', 1: 'Claro', 2: 'Parcial', 3: 'Nublado',
-        45: 'Niebla', 48: 'Niebla',
-        51: 'Llovizna Ligera', 53: 'Llovizna Mod', 55: 'Llovizna Int',
-        61: 'Lluvia Ligera', 63: 'Lluvia Mod', 65: 'Lluvia Int',
-        80: 'Chubascos Ligeros', 81: 'Chubascos Mod', 82: 'Chubascos Int',
-        95: 'Tormenta',
-    };
-    return conditions[code] || 'N/A';
 }

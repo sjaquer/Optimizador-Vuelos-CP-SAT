@@ -32,7 +32,8 @@ export default function Home() {
     numStations: 6,
     helicopterCapacity: 4,
     passengers: [],
-    weatherAnalysis: undefined,
+    weatherConditions: '',
+    operationalNotes: '',
   });
   const [flightPlans, setFlightPlans] = useState<FlightPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -165,7 +166,8 @@ export default function Home() {
             numStations, 
             helicopterCapacity, 
             passengers, 
-            weatherAnalysis: undefined // Reset weather on import
+            weatherConditions: '',
+            operationalNotes: '',
         });
         toast({
           title: 'Éxito',
