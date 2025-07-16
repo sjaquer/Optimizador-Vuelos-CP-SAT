@@ -23,7 +23,7 @@ interface Point {
 export function RouteMap({ plan, numStations }: RouteMapProps) {
   const [currentStep, setCurrentStep] = useState(0);
 
-  const { stationCoords, pathCoords } = useMemo(() => {
+  const { stationCoords } = useMemo(() => {
     const width = 500;
     const height = 500;
     const center = { x: width / 2, y: height / 2 };
@@ -40,30 +40,8 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
         y: center.y + radius * Math.sin(angle),
       };
     }
-
-    const pCoords: Point[] = [];
-    if (plan.steps.length > 0) {
-      let lastStation = 0;
-      plan.steps.forEach(step => {
-        if (step.action === 'TRAVEL' || pCoords.length === 0) {
-          pCoords.push(sCoords[lastStation]);
-          pCoords.push(sCoords[step.station]);
-          lastStation = step.station;
-        }
-      });
-    }
-    
-    // A bit of a hack to map slider steps to path segments
-    const flightPath = plan.steps.filter(s => s.action === 'TRAVEL');
-    if (currentStep < flightPath.length) {
-        const currentLegStart = sCoords[currentStep > 0 ? flightPath[currentStep-1].station : 0];
-        const currentLegEnd = sCoords[flightPath[currentStep].station];
-        pCoords.push(currentLegStart, currentLegEnd);
-    }
-
-
-    return { stationCoords: sCoords, pathCoords: pCoords };
-  }, [plan, numStations]);
+    return { stationCoords: sCoords };
+  }, [numStations]);
   
   const flightPath = plan.steps.filter(s => s.action === 'TRAVEL');
 
@@ -74,7 +52,6 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
     if (currentStep >= flightPath.length) {
       return stationCoords[flightPath[flightPath.length - 1]?.station ?? 0];
     }
-    const startStation = currentStep > 0 ? flightPath[currentStep-1].station : 0;
     const endStation = flightPath[currentStep].station;
 
     return stationCoords[endStation];
@@ -112,7 +89,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
 
             {/* Render full path faintly */}
             {flightPath.map((leg, index) => {
-              const startStation = index > 0 ? flightPath[index-1].station : 0;
+              const startStation = index > 0 ? flightPath[index-1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
               const endStation = leg.station;
               const start = stationCoords[startStation];
               const end = stationCoords[endStation];
@@ -133,7 +110,7 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
             
             {/* Render active path */}
             {flightPath.slice(0, currentStep + 1).map((leg, index) => {
-              const startStation = index > 0 ? flightPath[index-1].station : 0;
+              const startStation = index > 0 ? flightPath[index-1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
               const endStation = leg.station;
               const start = stationCoords[startStation];
               const end = stationCoords[endStation];
@@ -155,7 +132,6 @@ export function RouteMap({ plan, numStations }: RouteMapProps) {
               );
             })}
             
-
             {Object.entries(stationCoords).map(([id, coords]) => (
               <g key={id} transform={`translate(${coords.x}, ${coords.y})`}>
                 <circle

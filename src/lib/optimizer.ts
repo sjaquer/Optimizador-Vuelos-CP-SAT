@@ -1,416 +1,166 @@
 
-import type { Passenger, FlightPlan, FlightStep, ScenarioData } from './types';
+import type { TransportItem, FlightPlan, FlightStep, ScenarioData } from './types';
 
 const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
-/**
- * Generates a flight plan focused on serving the highest-priority passengers first,
- * while trying to optimize pickups and drop-offs along the way.
- */
-export function generatePlan(scenario: ScenarioData): FlightPlan {
-  const passengersToPickup = deepCopy(scenario.passengers);
-  let passengersInHelicopter: Passenger[] = [];
-  const steps: FlightStep[] = [];
-  let currentStation = 0; 
-  let passengersDelivered = 0;
+const stationCoords: Record<number, { x: number; y: number }> = {};
+let numStationsGlobal = 0;
 
-  // Initial move from base if necessary
-  if (passengersToPickup.length > 0) {
-    const sortedByPriority = passengersToPickup.sort((a,b) => a.priority - b.priority);
-    const firstPickupStation = sortedByPriority[0].originStation;
-    if (currentStation !== firstPickupStation) {
-      steps.push({
-        action: 'TRAVEL',
-        station: firstPickupStation,
-        passengers: [],
-        notes: `Despegue de la Base a la Estación ${firstPickupStation}`,
-      });
-      currentStation = firstPickupStation;
+function initializeCoords(numStations: number) {
+    if (numStations === numStationsGlobal && Object.keys(stationCoords).length > 0) {
+        return;
     }
-  }
-
-
-  while (passengersToPickup.length > 0 || passengersInHelicopter.length > 0) {
-    // 1. Drop off passengers at the current station
-    const passengersToDrop = passengersInHelicopter.filter(p => p.destinationStation === currentStation);
-    if (passengersToDrop.length > 0) {
-      passengersInHelicopter = passengersInHelicopter.filter(p => !passengersToDrop.find(dp => dp.id === p.id));
-      passengersDelivered += passengersToDrop.length;
-      steps.push({
-        action: 'DROPOFF',
-        station: currentStation,
-        passengers: passengersToDrop,
-        notes: `Desembarque de ${passengersToDrop.length} pasajero(s).`,
-      });
+    numStationsGlobal = numStations;
+    stationCoords[0] = { x: 0, y: 0 };
+    const radius = 100;
+    for (let i = 1; i <= numStations; i++) {
+        const angle = (i - 1) * (2 * Math.PI / numStations) - Math.PI / 2;
+        stationCoords[i] = {
+            x: radius * Math.cos(angle),
+            y: radius * Math.sin(angle),
+        };
     }
-
-    // 2. Pick up passengers from the current station
-    const passengersAvailableAtStation = passengersToPickup
-      .filter(p => p.originStation === currentStation)
-      .sort((a, b) => a.priority - b.priority);
-
-    const pickedUp: Passenger[] = [];
-    for (const p of passengersAvailableAtStation) {
-      if (passengersInHelicopter.length < scenario.helicopterCapacity) {
-        passengersInHelicopter.push(p);
-        const indexInWaiting = passengersToPickup.findIndex(wp => wp.id === p.id);
-        if (indexInWaiting > -1) {
-            passengersToPickup.splice(indexInWaiting, 1);
-        }
-        pickedUp.push(p);
-      }
-    }
-
-    if (pickedUp.length > 0) {
-      steps.push({
-        action: 'PICKUP',
-        station: currentStation,
-        passengers: pickedUp,
-        notes: `Embarque de ${pickedUp.length} pasajero(s).`,
-      });
-    }
-
-    // 3. Decide next station and travel
-    if (passengersToPickup.length > 0 || passengersInHelicopter.length > 0) {
-      // Prioritize dropping off passengers already in the helicopter
-      const dropoffStations = passengersInHelicopter.map(p => p.destinationStation);
-      // Then consider picking up highest priority passengers
-      const pickupStations = passengersToPickup.sort((a,b) => a.priority - b.priority).map(p => p.originStation);
-      
-      const targetStations = [...new Set([...dropoffStations, ...pickupStations])];
-      if (targetStations.length === 0) break;
-
-      // Simple strategy: go to the first available target. Could be improved with distance logic.
-      const nextStation = targetStations[0];
-      
-      if (currentStation !== nextStation) {
-        steps.push({
-          action: 'TRAVEL',
-          station: nextStation,
-          passengers: deepCopy(passengersInHelicopter),
-          notes: `Volando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextStation === 0 ? 'Base' : `Estación ${nextStation}`}`,
-        });
-        currentStation = nextStation;
-      }
-    }
-  }
-  
-  if (currentStation !== 0 && steps[steps.length - 1]?.station !== 0) {
-    steps.push({
-      action: 'TRAVEL',
-      station: 0,
-      passengers: [],
-      notes: 'Regreso final a la base.',
-    });
-  }
-
-  return {
-    id: 'priority_focused',
-    title: 'Plan A: Enfoque en Prioridad',
-    steps,
-    metrics: {
-      totalStops: new Set(steps.filter(s => s.action !== 'TRAVEL').map(s => s.station)).size,
-      totalDistance: steps.filter(s => s.action === 'TRAVEL').length,
-      passengersTransported: passengersDelivered,
-    },
-  };
 }
 
-/**
- * Generates an alternative flight plan that tries to minimize travel distance
- * by grouping passengers with nearby pickups and drop-offs.
- */
-export function generateAlternativePlan(scenario: ScenarioData): FlightPlan {
-  const passengersToPickup = deepCopy(scenario.passengers);
-  let passengersInHelicopter: Passenger[] = [];
-  const steps: FlightStep[] = [];
-  let currentStation = 0; 
-  let passengersDelivered = 0;
-
-  // --- Start of new logic ---
-  // Create station coordinates based on the map visualization
-  const stationCoords: Record<number, { x: number; y: number }> = { 0: { x: 0, y: 0 } };
-  const radius = 100; // Arbitrary radius for calculation
-  for (let i = 1; i <= scenario.numStations; i++) {
-    const angle = (i - 1) * (2 * Math.PI / scenario.numStations) - Math.PI / 2;
-    stationCoords[i] = {
-      x: radius * Math.cos(angle),
-      y: radius * Math.sin(angle),
-    };
-  }
-
-  const getDistance = (from: number, to: number) => {
+const getDistance = (from: number, to: number): number => {
     const fromCoord = stationCoords[from];
     const toCoord = stationCoords[to];
+    if (!fromCoord || !toCoord) return Infinity;
     return Math.sqrt(Math.pow(toCoord.x - fromCoord.x, 2) + Math.pow(toCoord.y - fromCoord.y, 2));
-  };
-  
-  const getNextClosestStation = (from: number, availableStations: number[]): number => {
+};
+
+const getNextClosestStation = (from: number, availableStations: number[]): number => {
     if (availableStations.length === 0) return -1;
-    return availableStations.sort((a,b) => getDistance(from, a) - getDistance(from, b))[0];
-  }
-  // --- End of new logic ---
+    return availableStations.sort((a, b) => getDistance(from, a) - getDistance(from, b))[0];
+};
 
-  while (passengersToPickup.length > 0 || passengersInHelicopter.length > 0) {
-     // 1. Dropoff at current station
-     const passengersToDrop = passengersInHelicopter.filter(p => p.destinationStation === currentStation);
-     if (passengersToDrop.length > 0) {
-         passengersInHelicopter = passengersInHelicopter.filter(p => !passengersToDrop.find(dp => dp.id === p.id));
-         passengersDelivered += passengersToDrop.length;
-         steps.push({
-             action: 'DROPOFF',
-             station: currentStation,
-             passengers: passengersToDrop,
-             notes: `Desembarque de ${passengersToDrop.length} pasajero(s).`,
-         });
-     }
+function runFlightSimulation(
+    idPrefix: string,
+    titlePrefix: string,
+    itemsToTransport: TransportItem[],
+    scenario: ScenarioData,
+    strategy: 'priority' | 'efficiency' | 'segments'
+): FlightPlan {
+    initializeCoords(scenario.numStations);
+    const itemsToPickup = deepCopy(itemsToTransport);
+    let itemsInHelicopter: TransportItem[] = [];
+    const steps: FlightStep[] = [];
+    let currentStation = 0;
+    let itemsDelivered = 0;
 
-      // 2. Pickup from current station (opportunistic)
-      if (passengersInHelicopter.length < scenario.helicopterCapacity) {
-          const passengersAvailableAtStation = passengersToPickup
-              .filter(p => p.originStation === currentStation)
-              .sort((a,b) => a.priority - b.priority);
+    while (itemsToPickup.length > 0 || itemsInHelicopter.length > 0) {
+        // 1. Drop off
+        const itemsToDrop = itemsInHelicopter.filter(p => p.destinationStation === currentStation);
+        if (itemsToDrop.length > 0) {
+            itemsInHelicopter = itemsInHelicopter.filter(p => !itemsToDrop.find(dp => dp.id === p.id));
+            itemsDelivered += itemsToDrop.length;
+            steps.push({ action: 'DROPOFF', station: currentStation, items: itemsToDrop, notes: `Desembarque de ${itemsToDrop.length} item(s).` });
+        }
 
-          const pickedUp: Passenger[] = [];
-          for (const p of passengersAvailableAtStation) {
-              if (passengersInHelicopter.length < scenario.helicopterCapacity) {
-                  passengersInHelicopter.push(p);
-                  pickedUp.push(p);
-                  const index = passengersToPickup.findIndex(pp => pp.id === p.id);
-                  if (index > -1) passengersToPickup.splice(index, 1);
-              } else {
-                  break;
-              }
-          }
+        // 2. Pick up
+        const capacityAvailable = scenario.helicopterCapacity - itemsInHelicopter.length;
+        if (capacityAvailable > 0) {
+            const itemsAvailableAtStation = itemsToPickup
+                .filter(p => p.originStation === currentStation)
+                .sort((a, b) => a.priority - b.priority);
 
-          if (pickedUp.length > 0) {
-              steps.push({
-                  action: 'PICKUP',
-                  station: currentStation,
-                  passengers: pickedUp,
-                  notes: `Embarque de ${pickedUp.length} pasajero(s).`,
-              });
-          }
-      }
+            const pickedUp: TransportItem[] = [];
+            for (const item of itemsAvailableAtStation) {
+                if (itemsInHelicopter.length < scenario.helicopterCapacity) {
+                    itemsInHelicopter.push(item);
+                    pickedUp.push(item);
+                    const index = itemsToPickup.findIndex(pp => pp.id === item.id);
+                    if (index > -1) itemsToPickup.splice(index, 1);
+                } else {
+                    break;
+                }
+            }
+            if (pickedUp.length > 0) {
+                steps.push({ action: 'PICKUP', station: currentStation, items: pickedUp, notes: `Embarque de ${pickedUp.length} item(s).` });
+            }
+        }
+        
+        // 3. Decide next move
+        if (itemsToPickup.length === 0 && itemsInHelicopter.length === 0) break;
 
-      // 3. Decide next station and travel
-      if (passengersToPickup.length > 0 || passengersInHelicopter.length > 0) {
-        const availablePickupStations = [...new Set(passengersToPickup.map(p => p.originStation))];
-        const availableDropoffStations = [...new Set(passengersInHelicopter.map(p => p.destinationStation))];
+        const availablePickupStations = [...new Set(itemsToPickup.map(p => p.originStation))];
+        const availableDropoffStations = [...new Set(itemsInHelicopter.map(p => p.destinationStation))];
         const allTargetStations = [...new Set([...availablePickupStations, ...availableDropoffStations])];
-   
+
         if (allTargetStations.length === 0) break;
-   
+
         let nextStation = -1;
-        // Prioritize dropping off if helicopter is full
-        if (passengersInHelicopter.length === scenario.helicopterCapacity && availableDropoffStations.length > 0) {
-            nextStation = getNextClosestStation(currentStation, availableDropoffStations);
-        } else {
-            nextStation = getNextClosestStation(currentStation, allTargetStations);
+        
+        // Strategy-based decision
+        if (strategy === 'priority') {
+            const highPriorityPickup = itemsToPickup.sort((a,b) => a.priority - b.priority)[0]?.originStation;
+            const targetStations = [...new Set([...availableDropoffStations, highPriorityPickup].filter(s => s !== undefined))]
+            nextStation = targetStations[0] ?? allTargetStations[0];
+        } else if (strategy === 'efficiency') {
+            if (itemsInHelicopter.length === scenario.helicopterCapacity && availableDropoffStations.length > 0) {
+                nextStation = getNextClosestStation(currentStation, availableDropoffStations);
+            } else {
+                nextStation = getNextClosestStation(currentStation, allTargetStations);
+            }
+        } else if (strategy === 'segments') {
+            if (itemsInHelicopter.length >= scenario.helicopterCapacity * 0.75 && availableDropoffStations.length > 0) {
+                nextStation = getNextClosestStation(currentStation, availableDropoffStations);
+            } else if (availablePickupStations.length > 0) {
+                const stationCounts = availablePickupStations.map(s => ({ station: s, count: itemsToPickup.filter(p => p.originStation === s).length, dist: getDistance(currentStation, s) }));
+                stationCounts.sort((a,b) => b.count - a.count || a.dist - b.dist);
+                nextStation = stationCounts[0].station;
+            } else {
+                nextStation = getNextClosestStation(currentStation, availableDropoffStations);
+            }
         }
 
         if (nextStation !== -1 && currentStation !== nextStation) {
-            steps.push({
-                action: 'TRAVEL',
-                station: nextStation,
-                passengers: deepCopy(passengersInHelicopter),
-                notes: `Volando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextStation === 0 ? 'Base' : `Estación ${nextStation}`}`,
-            });
+            steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
             currentStation = nextStation;
-        } else if (allTargetStations.length > 0 && availablePickupStations.length === 0 && availableDropoffStations.length === 0) {
-            // Stuck at a station with no one to pick up or drop off, but still people in the system.
-            const otherStations = allTargetStations.filter(s => s !== currentStation);
-            if (otherStations.length > 0) {
-                const nextBestStation = getNextClosestStation(currentStation, otherStations);
-                if(nextBestStation !== -1 && currentStation !== nextBestStation) {
-                     steps.push({
-                        action: 'TRAVEL',
-                        station: nextBestStation,
-                        passengers: deepCopy(passengersInHelicopter),
-                        notes: `Reposicionando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextBestStation === 0 ? 'Base' : `Estación ${nextBestStation}`}`,
-                    });
-                    currentStation = nextBestStation;
-                } else {
-                    break; 
-                }
-            } else {
-                break;
-            }
+        } else if (allTargetStations.every(s => s === currentStation) && itemsToPickup.length > 0) {
+            // Stuck, but there are pickups elsewhere. This should not happen with good logic but as a fallback.
+            break;
+        } else {
+            // No more valid moves.
+            break;
         }
-      }
-  }
-  
-    if (currentStation !== 0 && steps[steps.length - 1]?.station !== 0) {
-        steps.push({
-            action: 'TRAVEL',
-            station: 0,
-            passengers: [],
-            notes: 'Regreso final a la base.',
-        });
     }
 
-  return {
-    id: 'route_efficiency',
-    title: 'Plan B: Eficiencia de Ruta',
-    steps,
-    metrics: {
-        totalStops: new Set(steps.filter(s => s.action !== 'TRAVEL').map(s => s.station)).size,
-        totalDistance: steps.filter(s => s.action === 'TRAVEL').length,
-        passengersTransported: passengersDelivered,
-    },
-  };
+    if (currentStation !== 0) {
+        steps.push({ action: 'TRAVEL', station: 0, items: [], notes: 'Regreso final a la base.' });
+    }
+
+    return {
+        id: `${idPrefix}_${strategy}`,
+        title: `${titlePrefix}: ${strategy.charAt(0).toUpperCase() + strategy.slice(1)}`,
+        steps,
+        metrics: {
+            totalStops: new Set(steps.filter(s => s.action !== 'TRAVEL').map(s => s.station)).size,
+            totalDistance: steps.filter(s => s.action === 'TRAVEL').length,
+            itemsTransported: itemsDelivered,
+        },
+    };
 }
 
 
-/**
- * Generates a third flight plan that tries to minimize the number of travel legs
- * by grouping pickups and drop-offs efficiently.
- */
-export function generateThirdPlan(scenario: ScenarioData): FlightPlan {
-  const passengersToPickup = deepCopy(scenario.passengers);
-  let passengersInHelicopter: Passenger[] = [];
-  const steps: FlightStep[] = [];
-  let currentStation = 0;
-  let passengersDelivered = 0;
+export function generatePassengerPlans(scenario: ScenarioData): FlightPlan[] {
+    const passengers = scenario.transportItems.filter(item => item.type === 'PAX');
+    if (passengers.length === 0) return [];
+    
+    return [
+        runFlightSimulation('pax_a', 'Plan A', passengers, scenario, 'priority'),
+        runFlightSimulation('pax_b', 'Plan B', passengers, scenario, 'efficiency'),
+        runFlightSimulation('pax_c', 'Plan C', passengers, scenario, 'segments'),
+    ];
+}
 
-  const stationCoords: Record<number, { x: number; y: number }> = { 0: { x: 0, y: 0 } };
-  const radius = 100;
-  for (let i = 1; i <= scenario.numStations; i++) {
-    const angle = (i - 1) * (2 * Math.PI / scenario.numStations) - Math.PI / 2;
-    stationCoords[i] = { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
-  }
+export function generateCargoPlans(scenario: ScenarioData): FlightPlan[] {
+    const cargo = scenario.transportItems.filter(item => item.type === 'CARGO');
+    if (cargo.length === 0) return [];
 
-  const getDistance = (from: number, to: number) => {
-    const fromCoord = stationCoords[from];
-    const toCoord = stationCoords[to];
-    return Math.sqrt(Math.pow(toCoord.x - fromCoord.x, 2) + Math.pow(toCoord.y - fromCoord.y, 2));
-  };
-  
-  const getNextClosestStation = (from: number, availableStations: number[]): number => {
-    if (availableStations.length === 0) return -1;
-    return availableStations.sort((a,b) => getDistance(from, a) - getDistance(from, b))[0];
-  }
-
-
-  while (passengersToPickup.length > 0 || passengersInHelicopter.length > 0) {
-    // 1. Drop off passengers at the current station
-    const passengersToDrop = passengersInHelicopter.filter(p => p.destinationStation === currentStation);
-    if (passengersToDrop.length > 0) {
-      passengersInHelicopter = passengersInHelicopter.filter(p => !passengersToDrop.find(dp => dp.id === p.id));
-      passengersDelivered += passengersToDrop.length;
-      steps.push({
-        action: 'DROPOFF',
-        station: currentStation,
-        passengers: passengersToDrop,
-        notes: `Desembarque de ${passengersToDrop.length} pasajero(s).`,
-      });
-    }
-
-    // 2. Pick up passengers from the current station
-    if (passengersInHelicopter.length < scenario.helicopterCapacity) {
-      const passengersAvailableAtStation = passengersToPickup
-        .filter(p => p.originStation === currentStation)
-        .sort((a, b) => a.priority - b.priority);
-
-      const pickedUp: Passenger[] = [];
-      for (const p of passengersAvailableAtStation) {
-        if (passengersInHelicopter.length < scenario.helicopterCapacity) {
-          passengersInHelicopter.push(p);
-          const indexInWaiting = passengersToPickup.findIndex(wp => wp.id === p.id);
-          if (indexInWaiting > -1) {
-            passengersToPickup.splice(indexInWaiting, 1);
-          }
-          pickedUp.push(p);
-        }
-      }
-
-      if (pickedUp.length > 0) {
-        steps.push({
-          action: 'PICKUP',
-          station: currentStation,
-          passengers: pickedUp,
-          notes: `Embarque de ${pickedUp.length} pasajero(s).`,
-        });
-      }
-    }
-
-
-    // 3. Decide next station and travel
-    if (passengersToPickup.length === 0 && passengersInHelicopter.length === 0) {
-      break; 
-    }
-
-    let nextStation = -1;
-    const availableDropoffStations = [...new Set(passengersInHelicopter.map(p => p.destinationStation))];
-    const availablePickupStations = [...new Set(passengersToPickup.map(p => p.originStation))];
-
-    // STRATEGY: Prioritize drop-offs if nearing capacity, otherwise, go for most efficient pickup.
-    if (passengersInHelicopter.length >= scenario.helicopterCapacity * 0.75 && availableDropoffStations.length > 0) {
-      // Go to nearest dropoff to free up space
-      nextStation = getNextClosestStation(currentStation, availableDropoffStations);
-    } else if (availablePickupStations.length > 0) {
-      // Find the station where we can pick up the most people
-      const pickupStationCounts = availablePickupStations.map(station => ({
-        station,
-        count: passengersToPickup.filter(p => p.originStation === station).length,
-        distance: getDistance(currentStation, station),
-      }));
-      // Sort by most passengers, then by closest distance
-      pickupStationCounts.sort((a, b) => {
-        if (b.count !== a.count) return b.count - a.count;
-        return a.distance - b.distance;
-      });
-      nextStation = pickupStationCounts[0].station;
-    } else if (availableDropoffStations.length > 0) {
-      // Only dropoffs remain
-      nextStation = getNextClosestStation(currentStation, availableDropoffStations);
-    }
-
-    if (nextStation !== -1 && currentStation !== nextStation) {
-      steps.push({
-        action: 'TRAVEL',
-        station: nextStation,
-        passengers: deepCopy(passengersInHelicopter),
-        notes: `Volando de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${nextStation === 0 ? 'Base' : `Estación ${nextStation}`}`,
-      });
-      currentStation = nextStation;
-    } else if (passengersInHelicopter.length > 0 && availablePickupStations.length === 0) {
-        // All pickups done, just need to drop off remaining passengers
-        const finalDropoff = getNextClosestStation(currentStation, availableDropoffStations);
-        if (finalDropoff !== -1 && currentStation !== finalDropoff) {
-            steps.push({
-                action: 'TRAVEL',
-                station: finalDropoff,
-                passengers: deepCopy(passengersInHelicopter),
-                notes: `Volando a destino final de ${currentStation === 0 ? 'Base' : `Estación ${currentStation}`} a ${finalDropoff === 0 ? 'Base' : `Estación ${finalDropoff}`}`,
-            });
-            currentStation = finalDropoff;
-        } else {
-             break;
-        }
-    } else {
-      // No more moves to make
-      break;
-    }
-  }
-
-  if (currentStation !== 0 && steps[steps.length - 1]?.station !== 0) {
-    steps.push({
-      action: 'TRAVEL',
-      station: 0,
-      passengers: [],
-      notes: 'Regreso final a la base.',
-    });
-  }
-
-  return {
-    id: 'minimize_segments',
-    title: 'Plan C: Mínimos Tramos',
-    steps,
-    metrics: {
-      totalStops: new Set(steps.filter(s => s.action !== 'TRAVEL').map(s => s.station)).size,
-      totalDistance: steps.filter(s => s.action === 'TRAVEL').length,
-      passengersTransported: passengersDelivered,
-    },
-  };
+    return [
+        runFlightSimulation('cargo_d', 'Plan D', cargo, scenario, 'priority'),
+        runFlightSimulation('cargo_e', 'Plan E', cargo, scenario, 'efficiency'),
+        runFlightSimulation('cargo_f', 'Plan F', cargo, scenario, 'segments'),
+    ];
 }

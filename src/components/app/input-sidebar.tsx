@@ -6,10 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   SidebarHeader,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
   SidebarFooter,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
@@ -34,31 +30,34 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion"
+} from "@/components/ui/accordion";
 import { Textarea } from '../ui/textarea';
 import { CurrentDateTime } from './current-date-time';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 
-const passengerSchema = z.object({
+const transportItemSchema = z.object({
   id: z.string(),
-  name: z.string().min(1, 'El nombre es requerido'),
+  area: z.string().min(1, 'El área es requerida'),
+  type: z.enum(['PAX', 'CARGO']),
+  shift: z.enum(['M', 'T']),
   priority: z.coerce.number().min(1).max(5),
-  originStation: z.coerce.number().min(0), // 0 is base
-  destinationStation: z.coerce.number().min(0), // 0 is base
+  originStation: z.coerce.number().min(0),
+  destinationStation: z.coerce.number().min(0),
 });
 
 const formSchema = z.object({
   numStations: z.coerce.number().min(1, 'Se requiere al menos una estación'),
   helicopterCapacity: z.coerce.number().min(1, 'La capacidad debe ser al menos 1'),
-  passengers: z.array(passengerSchema),
+  transportItems: z.array(transportItemSchema),
   weatherConditions: z.string().optional(),
   operationalNotes: z.string().optional(),
 }).refine(data => {
-    return data.passengers.every(p => p.originStation <= data.numStations && p.destinationStation <= data.numStations);
-}, { message: "La estación debe ser menor o igual al número de estaciones", path: ["passengers"] })
+    return data.transportItems.every(p => p.originStation <= data.numStations && p.destinationStation <= data.numStations);
+}, { message: "La estación debe ser menor o igual al número de estaciones", path: ["transportItems"] })
  .refine(data => {
-    return data.passengers.every(p => p.originStation !== p.destinationStation);
- }, { message: "El origen y destino no pueden ser iguales", path: ["passengers"] });
+    return data.transportItems.every(p => p.originStation !== p.destinationStation);
+ }, { message: "El origen y destino no pueden ser iguales", path: ["transportItems"] });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -79,7 +78,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     defaultValues: {
       numStations: 6,
       helicopterCapacity: 4,
-      passengers: [],
+      transportItems: [],
       weatherConditions: '',
       operationalNotes: '',
     },
@@ -87,21 +86,17 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'passengers',
+    name: 'transportItems',
   });
 
   useEffect(() => {
-    const transformedPassengers = scenario.passengers.map(p => ({
-        ...p,
-        id: p.id || crypto.randomUUID(), 
-        originStation: p.originStation,
-        destinationStation: p.destinationStation,
-    }))
-
     form.reset({
       numStations: scenario.numStations,
       helicopterCapacity: scenario.helicopterCapacity,
-      passengers: transformedPassengers,
+      transportItems: scenario.transportItems.map(p => ({
+        ...p,
+        id: p.id || crypto.randomUUID(), 
+      })),
       weatherConditions: scenario.weatherConditions,
       operationalNotes: scenario.operationalNotes,
     });
@@ -123,7 +118,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
         toast({
             variant: "destructive",
             title: "Error de Validación",
-            description: "Por favor, corrige los errores en el formulario antes de generar un plan.",
+            description: "Por favor, corrige los errores en el formulario.",
         })
       }
     });
@@ -132,278 +127,181 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
   const loadScenarioFromHistory = (histScenario: ScenarioData) => {
     setScenario(histScenario);
     setActiveView('editor');
-    toast({
-      title: 'Escenario Cargado',
-      description: 'Se cargó el escenario desde el historial.',
-    });
+    toast({ title: 'Escenario Cargado', description: 'Se cargó el escenario desde el historial.' });
   };
 
   const deleteScenario = (scenarioId: string | undefined) => {
     if(!scenarioId) return;
     deleteScenarioFromHistory(scenarioId);
-    setHistory(getHistory()); // Refresh history view
-    toast({
-      title: 'Escenario Eliminado',
-      description: 'El escenario seleccionado ha sido eliminado del historial.',
-    });
+    setHistory(getHistory());
+    toast({ title: 'Escenario Eliminado', description: 'El escenario ha sido eliminado.' });
   }
 
   const maxStation = form.watch('numStations');
-
-  useEffect(() => {
-    fields.forEach((field, index) => {
-      const originValue = form.getValues(`passengers.${index}.originStation`);
-      const destinationValue = form.getValues(`passengers.${index}.destinationStation`);
-      if (originValue > maxStation) {
-        form.setValue(`passengers.${index}.originStation`, maxStation, { shouldValidate: true });
-      }
-      if (destinationValue > maxStation) {
-        form.setValue(`passengers.${index}.destinationStation`, maxStation, { shouldValidate: true });
-      }
-    });
-  }, [maxStation, fields, form]);
-
 
   return (
     <>
       <Form {...form}>
         <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="group-data-[collapsible=icon]:hidden">
-              <SidebarHeader>
-                  <Button
-                    variant={'ghost'}
-                    size="icon"
-                    className='h-7 w-7 self-end'
-                    onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
-                    aria-label="Historial"
-                  >
-                    <History />
-                  </Button>
-                  <CurrentDateTime />
-              </SidebarHeader>
-            </div>
-             {activeView === 'editor' && (
-              <div className="flex-1 min-h-0">
-                <ScrollArea className="h-full px-2">
-                  <div className="group-data-[collapsible=icon]:hidden">
-                    <SidebarGroup>
-                      <SidebarGroupLabel>Condiciones del Vuelo</SidebarGroupLabel>
-                      <SidebarGroupContent className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="weatherConditions"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Condiciones Climáticas</FormLabel>
-                              <FormControl>
-                                <Textarea placeholder="Ej: Viento 15km/h, visibilidad buena..." {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="operationalNotes"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Notas Operacionales</FormLabel>
-                              <FormControl>
-                                <Textarea placeholder="Ej: Priorizar carga frágil..." {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </SidebarGroupContent>
-                    </SidebarGroup>
+            <SidebarHeader className="group-data-[collapsible=icon]:hidden">
+                <Button
+                  variant={'ghost'}
+                  size="icon"
+                  className='h-7 w-7 self-end'
+                  onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
+                  aria-label="Historial"
+                  type="button"
+                >
+                  <History />
+                </Button>
+                <CurrentDateTime />
+            </SidebarHeader>
 
-                    <SidebarGroup>
-                      <SidebarGroupLabel>Configuración del Escenario</SidebarGroupLabel>
-                      <SidebarGroupContent className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="numStations"
-                          render={({ field }) => (
+            <div className="flex-1 min-h-0">
+             <ScrollArea className="h-full">
+              <div className="group-data-[collapsible=icon]:hidden p-2 space-y-4">
+                 {activeView === 'editor' ? (
+                  <>
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Condiciones del Vuelo</h3>
+                      <div className="space-y-4">
+                        <FormField control={form.control} name="weatherConditions" render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Estaciones</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
-                              <FormMessage />
+                              <FormLabel className="text-xs">Condiciones Climáticas</FormLabel>
+                              <FormControl><Textarea placeholder="Ej: Viento 15km/h..." {...field} /></FormControl>
                             </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="helicopterCapacity"
-                          render={({ field }) => (
+                          )}/>
+                        <FormField control={form.control} name="operationalNotes" render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Cap. Helicóptero</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
-                              <FormMessage />
+                              <FormLabel className="text-xs">Notas Operacionales</FormLabel>
+                              <FormControl><Textarea placeholder="Ej: Priorizar carga frágil..." {...field} /></FormControl>
                             </FormItem>
-                          )}
-                        />
-                      </SidebarGroupContent>
-                    </SidebarGroup>
+                          )}/>
+                      </div>
+                    </div>
 
-                    <SidebarGroup>
-                      <SidebarGroupLabel>Pasajeros</SidebarGroupLabel>
-                      <SidebarGroupContent className="space-y-3">
+                    <div>
+                       <h3 className="text-sm font-medium mb-2">Configuración</h3>
+                       <div className="grid grid-cols-2 gap-4">
+                          <FormField control={form.control} name="numStations" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Estaciones</FormLabel>
+                                <FormControl><Input type="number" {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}/>
+                          <FormField control={form.control} name="helicopterCapacity" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Cap. Helicóptero</FormLabel>
+                                <FormControl><Input type="number" {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}/>
+                       </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Items a Transportar</h3>
+                      <div className="space-y-3">
                         {fields.map((field, index) => (
                           <div key={field.id} className="flex flex-col gap-2 rounded-md border p-2">
                             <div className="flex items-end gap-2">
-                              <FormField
-                                  control={form.control}
-                                  name={`passengers.${index}.name`}
-                                  render={({ field }) => (
-                                    <FormItem className="flex-1">
-                                      <FormLabel className="text-xs">Nombre</FormLabel>
-                                      <FormControl>
-                                        <Input {...field} />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <Controller
-                                  control={form.control}
-                                  name={`passengers.${index}.priority`}
-                                  render={({ field }) => (
+                              <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormLabel className="text-xs">Área</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                  </FormItem>
+                                )}/>
+                                <Controller control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => (
                                     <FormItem>
                                       <FormLabel className="text-xs">Prio</FormLabel>
-                                      <FormControl>
-                                        <Input type="number" min="1" max="5" className="w-16" {...field} />
-                                      </FormControl>
+                                      <FormControl><Input type="number" min="1" max="5" className="w-16" {...field} /></FormControl>
                                     </FormItem>
-                                  )}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-9 w-9 shrink-0"
-                                  onClick={() => remove(index)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                  )}/>
+                                <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                            </div>
+                             <div className="grid grid-cols-2 gap-2">
+                                <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs">Tipo</FormLabel>
+                                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                          <SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGO</SelectItem></SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                  )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs">Turno</FormLabel>
+                                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                          <SelectContent><SelectItem value="M">Mañana</SelectItem><SelectItem value="T">Tarde</SelectItem></SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                  )}/>
                             </div>
                             <div className="flex items-center justify-center gap-2">
-                                <Controller
-                                  control={form.control}
-                                  name={`passengers.${index}.originStation`}
-                                  render={({ field }) => (
+                                <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => (
                                     <FormItem className="flex-1">
                                       <FormLabel className="text-xs">Origen (0=Base)</FormLabel>
-                                      <FormControl>
-                                        <Input type="number" min="0" max={maxStation} {...field} />
-                                      </FormControl>
+                                      <FormControl><Input type="number" min="0" max={maxStation} {...field} /></FormControl>
                                     </FormItem>
-                                  )}
-                                />
+                                  )}/>
                                 <ArrowRight className="mt-5 h-4 w-4 text-muted-foreground" />
-                                <Controller
-                                  control={form.control}
-                                  name={`passengers.${index}.destinationStation`}
-                                  render={({ field }) => (
+                                <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => (
                                     <FormItem className="flex-1">
                                       <FormLabel className="text-xs">Destino (0=Base)</FormLabel>
-                                      <FormControl>
-                                        <Input type="number" min="0" max={maxStation} {...field} />
-                                      </FormControl>
+                                      <FormControl><Input type="number" min="0" max={maxStation} {...field} /></FormControl>
                                     </FormItem>
-                                  )}
-                                />
+                                  )}/>
                             </div>
-                            <FormMessage>
-                                {form.formState.errors.passengers?.[index]?.root?.message ||
-                                form.formState.errors.passengers?.[index]?.originStation?.message ||
-                                form.formState.errors.passengers?.[index]?.destinationStation?.message ||
-                                form.formState.errors.passengers?.[index]?.name?.message
-                                }
-                            </FormMessage>
+                            <FormMessage>{form.formState.errors.transportItems?.[index]?.root?.message || form.formState.errors.transportItems?.[index]?.area?.message}</FormMessage>
                           </div>
                         ))}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => append({ id: crypto.randomUUID(), name: '', priority: 3, originStation: 1, destinationStation: 0 })}
-                        >
-                          <Plus className="mr-2" /> Agregar Pasajero
+                        <Button type="button" variant="outline" className="w-full" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 3, originStation: 1, destinationStation: 0 })}>
+                          <Plus className="mr-2" /> Agregar Item
                         </Button>
-                      </SidebarGroupContent>
-                    </SidebarGroup>
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-
-            {activeView === 'history' && (
-              <SidebarContent>
-                  <ScrollArea className="h-full px-2">
-                      <div className="group-data-[collapsible=icon]:hidden">
-                          <SidebarHeader>
-                              <Button
-                                variant={'ghost'}
-                                size="icon"
-                                className='h-7 w-7 self-end'
-                                onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
-                                aria-label="Editor"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-pen-line"><path d="m18 5-3-3H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M8 18h1"/><path d="M18.4 9.6a2 2 0 1 1 3 3L17 17l-4 1 1-4Z"/></svg>
-                              </Button>
-                              <CurrentDateTime />
-                           </SidebarHeader>
-                          <SidebarGroup>
-                              <SidebarGroupLabel>Historial de Escenarios</SidebarGroupLabel>
-                              <SidebarGroupContent>
-                                  {history.length > 0 ? (
-                                    <Accordion type="single" collapsible className="w-full">
-                                        {history.map((histScenario, index) => (
-                                          <AccordionItem value={`item-${index}`} key={histScenario.id}>
-                                            <AccordionTrigger>
-                                                <span className="truncate">
-                                                  Escenario del {new Date(histScenario.id!).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </AccordionTrigger>
-                                            <AccordionContent className='space-y-4'>
-                                              <div className='text-xs text-muted-foreground space-y-2'>
-                                                <p><strong>Pasajeros:</strong> {histScenario.passengers.length}</p>
-                                                <p><strong>Estaciones:</strong> {histScenario.numStations}</p>
-                                                <p><strong>Clima:</strong> {histScenario.weatherConditions || 'N/A'}</p>
-                                                <p><strong>Notas:</strong> {histScenario.operationalNotes || 'N/A'}</p>
-                                              </div>
-                                              <div className='flex gap-2'>
-                                                <Button size="sm" onClick={() => loadScenarioFromHistory(histScenario)} className="flex-1">Cargar</Button>
-                                                <Button size="sm" variant="destructive" onClick={() => deleteScenario(histScenario.id)}><Trash2/></Button>
-                                              </div>
-                                            </AccordionContent>
-                                          </AccordionItem>
-                                        ))}
-                                      </Accordion>
-                                  ) : (
-                                      <p className="text-sm text-muted-foreground text-center py-4">No hay escenarios guardados.</p>
-                                  )}
-                              </SidebarGroupContent>
-                          </SidebarGroup>
                       </div>
-                  </ScrollArea>
-              </SidebarContent>
-            )}
+                    </div>
+                  </>
+                ) : (
+                   <div>
+                       <h3 className="text-sm font-medium mb-2">Historial</h3>
+                        {history.length > 0 ? (
+                          <Accordion type="single" collapsible className="w-full">
+                              {history.map((histScenario, index) => (
+                                <AccordionItem value={`item-${index}`} key={histScenario.id}>
+                                  <AccordionTrigger>
+                                      <span className="truncate">
+                                        Escenario del {new Date(histScenario.id!).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                  </AccordionTrigger>
+                                  <AccordionContent className='space-y-4'>
+                                    <div className='text-xs text-muted-foreground space-y-2'>
+                                      <p><strong>Items:</strong> {histScenario.transportItems.length}</p>
+                                      <p><strong>Estaciones:</strong> {histScenario.numStations}</p>
+                                    </div>
+                                    <div className='flex gap-2'>
+                                      <Button size="sm" onClick={() => loadScenarioFromHistory(histScenario)} className="flex-1">Cargar</Button>
+                                      <Button size="sm" variant="destructive" onClick={() => deleteScenario(histScenario.id)}><Trash2/></Button>
+                                    </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              ))}
+                            </Accordion>
+                        ) : (<p className="text-sm text-muted-foreground text-center py-4">No hay escenarios guardados.</p>)}
+                   </div>
+                )}
+              </div>
+            </ScrollArea>
+            </div>
           </div>
 
           <SidebarFooter className="group-data-[collapsible=icon]:hidden">
-            <SidebarMenuButton
-              type="submit"
-              disabled={isLoading}
-              className="w-full"
-            >
+            <SidebarMenuButton type="submit" disabled={isLoading} className="w-full" tooltip="Generar Plan de Vuelo">
               {isLoading ? <Wind className="animate-spin" /> : <Wind />}
-              <span>Generar Plan de Vuelo</span>
+              <span className="group-data-[collapsible=icon]:hidden">Generar Plan de Vuelo</span>
             </SidebarMenuButton>
           </SidebarFooter>
         </form>

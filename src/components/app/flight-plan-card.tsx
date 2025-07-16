@@ -11,8 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FlightPlan, Passenger, ScenarioData, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download, ArrowRight, Waypoints, FileDown } from 'lucide-react';
+import type { FlightPlan, TransportItem, ScenarioData, FlightStep } from '@/lib/types';
+import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -48,12 +48,12 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
   }
 
   const handleExportExcel = () => {
-    const headers = ['Paso', 'Acción', 'Estación', 'Pasajeros', 'Notas'];
+    const headers = ['Paso', 'Acción', 'Estación', 'Items', 'Notas'];
     const rows = plan.steps.map((step, index) => [
       index + 1,
       getActionLabel(step.action),
       step.station === 0 ? 'Base' : `Estación ${step.station}`,
-      step.passengers.map(p => `${p.name} (P${p.priority})`).join(', '),
+      step.items.map(item => `${item.area}-${item.type} (P${item.priority})`).join(', '),
       step.notes,
     ]);
 
@@ -76,25 +76,22 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     const headStyles = { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' };
     const bodyStyles = { font: 'helvetica', fontSize: 10 };
 
-    // Título
     doc.setFontSize(18);
     doc.text(plan.title, pageWidth / 2, 20, { align: 'center' });
 
-    // Métricas
     doc.setFontSize(11);
     doc.setTextColor(100);
-    const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Pasajeros: ${plan.metrics.passengersTransported}`;
+    const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Items: ${plan.metrics.itemsTransported}`;
     doc.text(metricsText, pageWidth / 2, 28, { align: 'center' });
 
-    // Tabla
     autoTable(doc, {
       startY: 40,
-      head: [['Paso', 'Acción', 'Estación', 'Pasajeros', 'Notas']],
+      head: [['Paso', 'Acción', 'Estación', 'Items', 'Notas']],
       body: plan.steps.map((step, index) => [
         index + 1,
         getActionLabel(step.action),
         step.station === 0 ? 'Base' : `E-${step.station}`,
-        step.passengers.map(p => `${p.name} (P${p.priority})`).join('\n'),
+        step.items.map(p => `${p.area}-${p.type} (P${p.priority})`).join('\n'),
         step.notes
       ]),
       headStyles: headStyles,
@@ -107,7 +104,6 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
         4: { cellWidth: 'auto' }
       },
       didDrawPage: (data) => {
-        // Footer
         const str = 'Página ' + doc.internal.pages.length;
         doc.setFontSize(10);
         doc.text(str, data.settings.margin.left, doc.internal.pageSize.getHeight() - 10);
@@ -117,14 +113,15 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     doc.save(`plan_de_vuelo_${plan.id}.pdf`);
   }
 
-  const getPassengerLabel = (passenger: Passenger, action: FlightStep['action']) => {
-    const originLabel = passenger.originStation === 0 ? 'B' : passenger.originStation;
-    const destLabel = passenger.destinationStation === 0 ? 'B' : passenger.destinationStation;
+  const getItemLabel = (item: TransportItem) => {
+    const originLabel = item.originStation === 0 ? 'B' : item.originStation;
+    const destLabel = item.destinationStation === 0 ? 'B' : item.destinationStation;
+    const Icon = item.type === 'PAX' ? User : Package;
 
     return (
        <Badge variant="secondary" className="font-normal">
-          <User className="mr-1 h-3 w-3" />
-          {passenger.name} (P{passenger.priority})
+          <Icon className="mr-1 h-3 w-3" />
+          {item.area}-{item.type} (P{item.priority})
           <span className='mx-1.5 text-muted-foreground/80 flex items-center gap-0.5'>
             {originLabel} <ArrowRight className='h-3 w-3'/> {destLabel}
           </span>
@@ -159,8 +156,8 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
             <span>{plan.metrics.totalDistance} Tramos</span>
           </div>
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span>{plan.metrics.passengersTransported} Pasajeros</span>
+            {plan.id.includes('pax') ? <User className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+            <span>{plan.metrics.itemsTransported} Items</span>
           </div>
         </div>
       </CardHeader>
@@ -171,7 +168,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
               <TableRow>
                 <TableHead className="w-[80px]">Acción</TableHead>
                 <TableHead>Estación</TableHead>
-                <TableHead>Pasajeros</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead>Notas</TableHead>
               </TableRow>
             </TableHeader>
@@ -189,9 +186,9 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {step.passengers.map((p) => (
-                       <div key={p.id}>
-                          {getPassengerLabel(p, step.action)}
+                      {step.items.map((item) => (
+                       <div key={item.id}>
+                          {getItemLabel(item)}
                        </div>
                       ))}
                     </div>

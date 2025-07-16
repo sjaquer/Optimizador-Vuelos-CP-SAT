@@ -1,9 +1,9 @@
-// src/lib/history.ts
+
 'use client';
 
 import type { ScenarioData } from './types';
 
-const HISTORY_KEY = 'ovh_flight_history';
+const HISTORY_KEY = 'ovh_flight_history_v2';
 const MAX_HISTORY_ITEMS = 20;
 
 export const getHistory = (): ScenarioData[] => {
@@ -23,15 +23,19 @@ export const saveScenarioToHistory = (scenario: ScenarioData): void => {
    if (typeof window === 'undefined') {
     return;
   }
-  const history = getHistory();
+  let history = getHistory();
   
   // Add a unique ID if it doesn't have one
-  const newScenario = {
+  const newScenarioWithId = {
       ...scenario,
       id: new Date().toISOString()
   };
 
-  const newHistory = [newScenario, ...history].slice(0, MAX_HISTORY_ITEMS);
+  // Prevent duplicates by checking if a very similar scenario exists.
+  // This is a simple check; more complex logic could be used.
+  history = history.filter(h => h.transportItems.length !== scenario.transportItems.length);
+
+  const newHistory = [newScenarioWithId, ...history].slice(0, MAX_HISTORY_ITEMS);
   
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));

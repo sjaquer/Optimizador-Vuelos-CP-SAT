@@ -1,6 +1,8 @@
-export interface Passenger {
+export interface TransportItem {
   id: string;
-  name: string;
+  area: string;
+  type: 'PAX' | 'CARGO';
+  shift: 'M' | 'T'; // Mañana o Tarde
   priority: number;
   originStation: number;
   destinationStation: number;
@@ -9,7 +11,7 @@ export interface Passenger {
 export interface FlightStep {
   action: 'TRAVEL' | 'PICKUP' | 'DROPOFF';
   station: number;
-  passengers: Passenger[];
+  items: TransportItem[];
   notes: string;
 }
 
@@ -20,7 +22,7 @@ export interface FlightPlan {
   metrics: {
     totalStops: number;
     totalDistance: number; 
-    passengersTransported: number;
+    itemsTransported: number;
   };
 }
 
@@ -28,7 +30,7 @@ export interface ScenarioData {
     id?: string; // Unique identifier for history
     numStations: number;
     helicopterCapacity: number;
-    passengers: Passenger[];
+    transportItems: TransportItem[];
     weatherConditions?: string;
     operationalNotes?: string;
 }
