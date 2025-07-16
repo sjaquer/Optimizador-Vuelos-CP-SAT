@@ -1,13 +1,22 @@
 
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { FlightPlan, Passenger, ScenarioData, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download, ArrowRight, Waypoints } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Users, Wind, Milestone, Download, ArrowRight, Waypoints, FileDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 
 interface FlightPlanCardProps {
   plan: FlightPlan;
@@ -38,7 +47,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     return actionTranslations[action] || action;
   }
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const headers = ['Paso', 'Acción', 'Estación', 'Pasajeros', 'Notas'];
     const rows = plan.steps.map((step, index) => [
       index + 1,
@@ -61,6 +70,53 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     document.body.removeChild(link);
   };
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const headStyles = { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' };
+    const bodyStyles = { font: 'helvetica', fontSize: 10 };
+
+    // Título
+    doc.setFontSize(18);
+    doc.text(plan.title, pageWidth / 2, 20, { align: 'center' });
+
+    // Métricas
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Pasajeros: ${plan.metrics.passengersTransported}`;
+    doc.text(metricsText, pageWidth / 2, 28, { align: 'center' });
+
+    // Tabla
+    autoTable(doc, {
+      startY: 40,
+      head: [['Paso', 'Acción', 'Estación', 'Pasajeros', 'Notas']],
+      body: plan.steps.map((step, index) => [
+        index + 1,
+        getActionLabel(step.action),
+        step.station === 0 ? 'Base' : `E-${step.station}`,
+        step.passengers.map(p => `${p.name} (P${p.priority})`).join('\n'),
+        step.notes
+      ]),
+      headStyles: headStyles,
+      bodyStyles: bodyStyles,
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 'auto' },
+        4: { cellWidth: 'auto' }
+      },
+      didDrawPage: (data) => {
+        // Footer
+        const str = 'Página ' + doc.internal.pages.length;
+        doc.setFontSize(10);
+        doc.text(str, data.settings.margin.left, doc.internal.pageSize.getHeight() - 10);
+      }
+    });
+
+    doc.save(`plan_de_vuelo_${plan.id}.pdf`);
+  }
+
   const getPassengerLabel = (passenger: Passenger, action: FlightStep['action']) => {
     const originLabel = passenger.originStation === 0 ? 'B' : passenger.originStation;
     const destLabel = passenger.destinationStation === 0 ? 'B' : passenger.destinationStation;
@@ -81,9 +137,17 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>{plan.title}</span>
-          <Button size="icon" variant="ghost" onClick={handleExport}>
-            <Download className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost">
+                <FileDown className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF}>Descargar PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcel}>Descargar Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardTitle>
         <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
