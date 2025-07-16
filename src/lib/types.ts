@@ -24,11 +24,38 @@ export interface FlightPlan {
   };
 }
 
+export interface WeatherAnalysis {
+  summary: string;
+  riskLevel: "Bajo" | "Medio" | "Alto";
+  details: {
+    temperature: number;
+    windSpeed: number;
+    precipitation: number;
+    weatherCode: number;
+  };
+}
+
 export interface ScenarioData {
     id?: string; // Unique identifier for history
     numStations: number;
     helicopterCapacity: number;
     passengers: Passenger[];
-    weatherConditions?: string;
-    operationalNotes?: string;
+    weatherAnalysis?: WeatherAnalysis;
+}
+
+// Type for Open-Meteo API response
+export interface WeatherData {
+  current: {
+    temperature_2m: number;
+    precipitation: number;
+    weather_code: number;
+    wind_speed_10m: number;
+  };
+  hourly: {
+    time: string[];
+    temperature_2m: number[];
+    precipitation_probability: number[];
+    weather_code: number[];
+    wind_speed_10m: number[];
+  };
 }

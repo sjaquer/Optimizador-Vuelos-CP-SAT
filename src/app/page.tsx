@@ -32,8 +32,7 @@ export default function Home() {
     numStations: 6,
     helicopterCapacity: 4,
     passengers: [],
-    weatherConditions: 'Despejado, vientos ligeros de 5 nudos.',
-    operationalNotes: 'Priorizar evacuaciones médicas. Todas las operaciones deben cesar al anochecer.',
+    weatherAnalysis: undefined,
   });
   const [flightPlans, setFlightPlans] = useState<FlightPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -141,9 +140,7 @@ export default function Home() {
 
         const numStations = configData.find(row => row.Clave === 'numStations')?.Valor;
         const helicopterCapacity = configData.find(row => row.Clave === 'helicopterCapacity')?.Valor;
-        const weatherConditions = configData.find(row => row.Clave === 'weatherConditions')?.Valor || scenario.weatherConditions;
-        const operationalNotes = configData.find(row => row.Clave === 'operationalNotes')?.Valor || scenario.operationalNotes;
-
+        
         if (numStations === undefined || helicopterCapacity === undefined) {
           throw new Error("El formato de la hoja 'Configuracion' es incorrecto.");
         }
@@ -164,7 +161,12 @@ export default function Home() {
             throw new Error("La hoja 'Pasajeros' tiene filas con datos incompletos o incorrectos.");
         }
 
-        setScenario({ numStations, helicopterCapacity, passengers, weatherConditions, operationalNotes });
+        setScenario({ 
+            numStations, 
+            helicopterCapacity, 
+            passengers, 
+            weatherAnalysis: undefined // Reset weather on import
+        });
         toast({
           title: 'Éxito',
           description: 'Los datos del escenario se importaron correctamente desde Excel.',
