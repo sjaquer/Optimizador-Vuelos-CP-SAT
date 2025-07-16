@@ -6,6 +6,8 @@ export interface TransportItem {
   priority: number;
   originStation: number;
   destinationStation: number;
+  weight: number;
+  description: string;
 }
 
 export interface FlightStep {
@@ -23,6 +25,8 @@ export interface FlightPlan {
     totalStops: number;
     totalDistance: number; 
     itemsTransported: number;
+    totalWeight: number;
+    maxWeightRatio: number;
   };
 }
 
@@ -30,6 +34,7 @@ export interface ScenarioData {
     id?: string; // Unique identifier for history
     numStations: number;
     helicopterCapacity: number;
+    helicopterMaxWeight: number;
     transportItems: TransportItem[];
     weatherConditions?: string;
     operationalNotes?: string;

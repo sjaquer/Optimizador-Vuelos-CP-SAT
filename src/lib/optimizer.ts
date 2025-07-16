@@ -26,7 +26,7 @@ const getDistance = (from: number, to: number): number => {
     const fromCoord = stationCoords[from];
     const toCoord = stationCoords[to];
     if (!fromCoord || !toCoord) return Infinity;
-    return Math.sqrt(Math.pow(toCoord.x - fromCoord.x, 2) + Math.pow(toCoord.y - fromCoord.y, 2));
+    return Math.round(Math.sqrt(Math.pow(toCoord.x - fromCoord.x, 2) + Math.pow(toCoord.y - fromCoord.y, 2)));
 };
 
 const getNextClosestStation = (from: number, availableStations: number[]): number => {
@@ -34,7 +34,7 @@ const getNextClosestStation = (from: number, availableStations: number[]): numbe
     return availableStations.sort((a, b) => getDistance(from, a) - getDistance(from, b))[0];
 };
 
-function runFlightSimulation(
+export function runFlightSimulation(
     idPrefix: string,
     titlePrefix: string,
     itemsToTransport: TransportItem[],
@@ -47,6 +47,10 @@ function runFlightSimulation(
     const steps: FlightStep[] = [];
     let currentStation = 0;
     let itemsDelivered = 0;
+    let totalWeightTransported = 0;
+    let maxWeightRatio = 0;
+
+    const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + item.weight, 0);
 
     while (itemsToPickup.length > 0 || itemsInHelicopter.length > 0) {
         // 1. Drop off
@@ -54,6 +58,7 @@ function runFlightSimulation(
         if (itemsToDrop.length > 0) {
             itemsInHelicopter = itemsInHelicopter.filter(p => !itemsToDrop.find(dp => dp.id === p.id));
             itemsDelivered += itemsToDrop.length;
+            totalWeightTransported += itemsToDrop.reduce((sum, item) => sum + item.weight, 0);
             steps.push({ action: 'DROPOFF', station: currentStation, items: itemsToDrop, notes: `Desembarque de ${itemsToDrop.length} item(s).` });
         }
 
@@ -66,7 +71,7 @@ function runFlightSimulation(
 
             const pickedUp: TransportItem[] = [];
             for (const item of itemsAvailableAtStation) {
-                if (itemsInHelicopter.length < scenario.helicopterCapacity) {
+                if (itemsInHelicopter.length < scenario.helicopterCapacity && (getCurrentWeight() + item.weight) <= scenario.helicopterMaxWeight) {
                     itemsInHelicopter.push(item);
                     pickedUp.push(item);
                     const index = itemsToPickup.findIndex(pp => pp.id === item.id);
@@ -80,6 +85,8 @@ function runFlightSimulation(
             }
         }
         
+        maxWeightRatio = Math.max(maxWeightRatio, getCurrentWeight() / scenario.helicopterMaxWeight);
+
         // 3. Decide next move
         if (itemsToPickup.length === 0 && itemsInHelicopter.length === 0) break;
 
@@ -95,7 +102,7 @@ function runFlightSimulation(
         if (strategy === 'priority') {
             const highPriorityPickup = itemsToPickup.sort((a,b) => a.priority - b.priority)[0]?.originStation;
             const targetStations = [...new Set([...availableDropoffStations, highPriorityPickup].filter(s => s !== undefined))]
-            nextStation = targetStations[0] ?? allTargetStations[0];
+            nextStation = targetStations[0] ?? getNextClosestStation(currentStation, allTargetStations);
         } else if (strategy === 'efficiency') {
             if (itemsInHelicopter.length === scenario.helicopterCapacity && availableDropoffStations.length > 0) {
                 nextStation = getNextClosestStation(currentStation, availableDropoffStations);
@@ -117,11 +124,15 @@ function runFlightSimulation(
         if (nextStation !== -1 && currentStation !== nextStation) {
             steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
             currentStation = nextStation;
-        } else if (allTargetStations.every(s => s === currentStation) && itemsToPickup.length > 0) {
-            // Stuck, but there are pickups elsewhere. This should not happen with good logic but as a fallback.
-            break;
+        } else if (itemsInHelicopter.length > 0) {
+             nextStation = getNextClosestStation(currentStation, availableDropoffStations);
+             if(nextStation !== -1 && currentStation !== nextStation) {
+                steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de ${currentStation === 0 ? 'Base' : `E-${currentStation}`} a ${nextStation === 0 ? 'Base' : `E-${nextStation}`}` });
+                currentStation = nextStation;
+             } else {
+                break;
+             }
         } else {
-            // No more valid moves.
             break;
         }
     }
@@ -131,36 +142,15 @@ function runFlightSimulation(
     }
 
     return {
-        id: `${idPrefix}_${strategy}`,
+        id: `${idPrefix}_${strategy}_${itemsToTransport[0]?.shift || 'all'}`,
         title: `${titlePrefix}: ${strategy.charAt(0).toUpperCase() + strategy.slice(1)}`,
         steps,
         metrics: {
             totalStops: new Set(steps.filter(s => s.action !== 'TRAVEL').map(s => s.station)).size,
             totalDistance: steps.filter(s => s.action === 'TRAVEL').length,
             itemsTransported: itemsDelivered,
+            totalWeight: totalWeightTransported,
+            maxWeightRatio,
         },
     };
-}
-
-
-export function generatePassengerPlans(scenario: ScenarioData): FlightPlan[] {
-    const passengers = scenario.transportItems.filter(item => item.type === 'PAX');
-    if (passengers.length === 0) return [];
-    
-    return [
-        runFlightSimulation('pax_a', 'Plan A', passengers, scenario, 'priority'),
-        runFlightSimulation('pax_b', 'Plan B', passengers, scenario, 'efficiency'),
-        runFlightSimulation('pax_c', 'Plan C', passengers, scenario, 'segments'),
-    ];
-}
-
-export function generateCargoPlans(scenario: ScenarioData): FlightPlan[] {
-    const cargo = scenario.transportItems.filter(item => item.type === 'CARGO');
-    if (cargo.length === 0) return [];
-
-    return [
-        runFlightSimulation('cargo_d', 'Plan D', cargo, scenario, 'priority'),
-        runFlightSimulation('cargo_e', 'Plan E', cargo, scenario, 'efficiency'),
-        runFlightSimulation('cargo_f', 'Plan F', cargo, scenario, 'segments'),
-    ];
 }

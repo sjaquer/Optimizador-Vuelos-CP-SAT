@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,16 +11,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { FlightPlan, TransportItem, ScenarioData, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { runFlightSimulation } from '@/lib/optimizer';
+import { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 
 interface FlightPlanCardProps {
-  plan: FlightPlan;
+  basePlan: FlightPlan;
   scenario: ScenarioData;
+  itemType: 'PAX' | 'CARGO';
+  onPlanUpdate: (plan: FlightPlan) => void;
 }
 
 const actionTranslations: Record<FlightStep['action'], string> = {
@@ -29,33 +40,94 @@ const actionTranslations: Record<FlightStep['action'], string> = {
   TRAVEL: 'VIAJAR',
 };
 
-export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
+export function FlightPlanCard({ basePlan, scenario, itemType, onPlanUpdate }: FlightPlanCardProps) {
+  const [activeShift, setActiveShift] = useState<'M' | 'T'>('M');
+  const [currentPlan, setCurrentPlan] = useState<FlightPlan>(basePlan);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const strategy = useMemo(() => {
+     const parts = basePlan.id.split('_');
+     return parts[1] as 'priority' | 'efficiency' | 'segments';
+  }, [basePlan.id]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const relevantItems = scenario.transportItems.filter(item => item.type === itemType && item.shift === activeShift);
+    
+    if (relevantItems.length === 0) {
+      setCurrentPlan({
+        ...basePlan,
+        steps: [],
+        metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    const idPrefix = itemType.toLowerCase();
+    const titlePrefix = basePlan.title.split(':')[0];
+    
+    const newPlan = runFlightSimulation(idPrefix, titlePrefix, relevantItems, scenario, strategy);
+    setCurrentPlan(newPlan);
+    onPlanUpdate(newPlan);
+    setIsLoading(false);
+
+  }, [activeShift, scenario, itemType, basePlan, strategy, onPlanUpdate]);
+
+
   const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
-      case 'PICKUP':
-        return <PlaneTakeoff className="h-4 w-4 text-green-600" />;
-      case 'DROPOFF':
-        return <PlaneLanding className="h-4 w-4 text-blue-600" />;
-      case 'TRAVEL':
-        return <Waypoints className="h-4 w-4 text-muted-foreground" />;
-      default:
-        return null;
+      case 'PICKUP': return <PlaneTakeoff className="h-4 w-4 text-green-600" />;
+      case 'DROPOFF': return <PlaneLanding className="h-4 w-4 text-blue-600" />;
+      case 'TRAVEL': return <Waypoints className="h-4 w-4 text-muted-foreground" />;
+      default: return null;
     }
   };
   
-  const getActionLabel = (action: FlightStep['action']) => {
-    return actionTranslations[action] || action;
-  }
+  const getActionLabel = (action: FlightStep['action']) => actionTranslations[action] || action;
 
-  const handleExportExcel = () => {
-    const headers = ['Paso', 'Acción', 'Estación', 'Items', 'Notas'];
-    const rows = plan.steps.map((step, index) => [
-      index + 1,
-      getActionLabel(step.action),
-      step.station === 0 ? 'Base' : `Estación ${step.station}`,
-      step.items.map(item => `${item.area}-${item.type} (P${item.priority})`).join(', '),
-      step.notes,
-    ]);
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`${currentPlan.title} (Turno ${activeShift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    doc.setFontSize(11);
+    const metricsText = `Paradas: ${currentPlan.metrics.totalStops} | Tramos: ${currentPlan.metrics.totalDistance} | Items: ${currentPlan.metrics.itemsTransported} | Peso Máx: ${(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%`;
+    doc.text(metricsText, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
+    
+    autoTable(doc, {
+      startY: 40,
+      head: [['Paso', 'Acción', 'Estación', 'Items', 'Notas']],
+      body: currentPlan.steps.map((step, index) => [
+        index + 1,
+        getActionLabel(step.action),
+        step.station === 0 ? 'Base' : `E-${step.station}`,
+        step.items.map(p => `${p.area}-${p.type} (P${p.priority}) / ${p.weight}kg`).join('\n'),
+        step.notes
+      ]),
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    });
+    doc.save(`plan_${currentPlan.id}_${activeShift}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const headers = ['Paso', 'Acción', 'Estación', 'Area', 'Tipo', 'Prioridad', 'Peso', 'Descripción', 'Notas'];
+    const rows = currentPlan.steps.flatMap((step, index) => {
+        if (step.items.length === 0) {
+            return [[index + 1, getActionLabel(step.action), step.station === 0 ? 'Base' : `E-${step.station}`, '', '', '', '', '', step.notes]];
+        }
+        return step.items.map(item => [
+            index + 1,
+            getActionLabel(step.action),
+            step.station === 0 ? 'Base' : `E-${step.station}`,
+            item.area,
+            item.type,
+            item.priority,
+            item.weight,
+            item.description,
+            step.notes
+        ]);
+    });
 
     let csvContent = "data:text/csv;charset=utf-8," 
       + headers.join(",") + "\n" 
@@ -64,54 +136,11 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `plan_de_vuelo_${plan.id}.csv`);
+    link.setAttribute("download", `plan_${currentPlan.id}_${activeShift}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
-
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const headStyles = { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' };
-    const bodyStyles = { font: 'helvetica', fontSize: 10 };
-
-    doc.setFontSize(18);
-    doc.text(plan.title, pageWidth / 2, 20, { align: 'center' });
-
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Items: ${plan.metrics.itemsTransported}`;
-    doc.text(metricsText, pageWidth / 2, 28, { align: 'center' });
-
-    autoTable(doc, {
-      startY: 40,
-      head: [['Paso', 'Acción', 'Estación', 'Items', 'Notas']],
-      body: plan.steps.map((step, index) => [
-        index + 1,
-        getActionLabel(step.action),
-        step.station === 0 ? 'Base' : `E-${step.station}`,
-        step.items.map(p => `${p.area}-${p.type} (P${p.priority})`).join('\n'),
-        step.notes
-      ]),
-      headStyles: headStyles,
-      bodyStyles: bodyStyles,
-      columnStyles: {
-        0: { cellWidth: 15 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 'auto' },
-        4: { cellWidth: 'auto' }
-      },
-      didDrawPage: (data) => {
-        const str = 'Página ' + doc.internal.pages.length;
-        doc.setFontSize(10);
-        doc.text(str, data.settings.margin.left, doc.internal.pageSize.getHeight() - 10);
-      }
-    });
-
-    doc.save(`plan_de_vuelo_${plan.id}.pdf`);
-  }
 
   const getItemLabel = (item: TransportItem) => {
     const originLabel = item.originStation === 0 ? 'B' : item.originStation;
@@ -119,7 +148,7 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
     const Icon = item.type === 'PAX' ? User : Package;
 
     return (
-       <Badge variant="secondary" className="font-normal">
+       <Badge variant="secondary" className="font-normal h-6">
           <Icon className="mr-1 h-3 w-3" />
           {item.area}-{item.type} (P{item.priority})
           <span className='mx-1.5 text-muted-foreground/80 flex items-center gap-0.5'>
@@ -128,76 +157,76 @@ export function FlightPlanCard({ plan, scenario }: FlightPlanCardProps) {
        </Badge>
     )
   }
+  
+  const hasContent = currentPlan.steps.length > 0;
 
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>{plan.title}</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost">
-                <FileDown className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportPDF}>Descargar PDF</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportExcel}>Descargar Excel</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </CardTitle>
-        <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Milestone className="h-4 w-4" />
-            <span>{plan.metrics.totalStops} Paradas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Wind className="h-4 w-4" />
-            <span>{plan.metrics.totalDistance} Tramos</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {plan.id.includes('pax') ? <User className="h-4 w-4" /> : <Package className="h-4 w-4" />}
-            <span>{plan.metrics.itemsTransported} Items</span>
-          </div>
+        <div className='flex items-start justify-between gap-4'>
+            <CardTitle>{currentPlan.title}</CardTitle>
+            <div className='flex items-center gap-2'>
+              <Select value={activeShift} onValueChange={(v: 'M' | 'T') => setActiveShift(v)}>
+                <SelectTrigger className="w-[120px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M">Mañana</SelectItem>
+                  <SelectItem value="T">Tarde</SelectItem>
+                </SelectContent>
+              </Select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" variant="ghost" className='h-9 w-9' disabled={!hasContent}>
+                    <FileDown className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportToPDF}>Descargar PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToExcel}>Descargar Excel</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
         </div>
+        {hasContent && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2"><Milestone className="h-4 w-4" /><span>{currentPlan.metrics.totalStops} Paradas</span></div>
+              <div className="flex items-center gap-2"><Wind className="h-4 w-4" /><span>{currentPlan.metrics.totalDistance} Tramos</span></div>
+              <div className="flex items-center gap-2">{itemType === 'PAX' ? <User className="h-4 w-4" /> : <Package className="h-4 w-4" />}<span>{currentPlan.metrics.itemsTransported} Items</span></div>
+              <div className="flex items-center gap-2"><Scale className="h-4 w-4" /><span>Peso Máx: {(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
+            </div>
+        )}
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
         <ScrollArea className="h-80">
+          {isLoading ? <p className='text-center p-8 text-muted-foreground'>Calculando...</p> : 
+          !hasContent ? (
+             <div className='flex flex-col items-center justify-center h-full text-center p-4'>
+                <AlertTriangle className='h-10 w-10 text-muted-foreground/50 mb-2' />
+                <p className='font-medium'>Sin datos para este turno</p>
+                <p className='text-sm text-muted-foreground'>No hay {itemType === 'PAX' ? 'pasajeros' : 'cargas'} para el turno de la {activeShift === 'M' ? 'mañana' : 'tarde'}.</p>
+             </div>
+          ) : (
           <Table>
             <TableHeader className="sticky top-0 bg-card">
-              <TableRow>
-                <TableHead className="w-[80px]">Acción</TableHead>
-                <TableHead>Estación</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Notas</TableHead>
-              </TableRow>
+              <TableRow><TableHead className="w-[80px]">Acción</TableHead><TableHead>Estación</TableHead><TableHead>Items</TableHead><TableHead>Notas</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {plan.steps.map((step, index) => (
+              {currentPlan.steps.map((step, index) => (
                 <TableRow key={index}>
+                  <TableCell><div className="flex items-center gap-2 font-medium">{getActionIcon(step.action)}<span>{getActionLabel(step.action)}</span></div></TableCell>
+                  <TableCell>{step.station === 0 ? 'Base' : `Estación ${step.station}`}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2 font-medium">
-                      {getActionIcon(step.action)}
-                      <span>{getActionLabel(step.action)}</span>
+                    <div className="flex flex-col gap-1">
+                      {step.items.map((item) => ( <div key={item.id}>{getItemLabel(item)}</div> ))}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {step.station === 0 ? 'Base' : `Estación ${step.station}`}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {step.items.map((item) => (
-                       <div key={item.id}>
-                          {getItemLabel(item)}
-                       </div>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{step.notes}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{step.notes}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          )}
         </ScrollArea>
       </CardContent>
     </Card>
