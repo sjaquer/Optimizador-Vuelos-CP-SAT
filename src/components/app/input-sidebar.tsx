@@ -167,16 +167,16 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     <>
       <Form {...form}>
         <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 flex flex-col group-data-[collapsible=icon]:hidden">
              {activeView === 'editor' && (
-              <SidebarContent className="group-data-[collapsible=icon]:hidden flex-1">
+              <SidebarContent className="flex-1 min-h-0">
                 <ScrollArea className="h-full px-2">
                   <div className="group-data-[collapsible=icon]:hidden">
                     <SidebarHeader>
                       <Button
                         variant={'ghost'}
                         size="icon"
-                        className='h-7 w-7 self-end group-data-[collapsible=icon]:hidden'
+                        className='h-7 w-7 self-end'
                         onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
                         aria-label="Historial"
                       >
@@ -391,15 +391,14 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
             )}
           </div>
 
-          <SidebarFooter className="group-data-[collapsible=icon]:hidden">
+          <SidebarFooter>
             <SidebarMenuButton
               type="submit"
               disabled={isLoading}
-              className="w-full"
-              tooltip={{ content: "Generar Plan de Vuelo" }}
+              className="w-full group-data-[collapsible=icon]:hidden"
             >
               {isLoading ? <Wind className="animate-spin" /> : <Wind />}
-              <span className="group-data-[collapsible=icon]:hidden">Generar Plan de Vuelo</span>
+              <span>Generar Plan de Vuelo</span>
             </SidebarMenuButton>
           </SidebarFooter>
         </form>
