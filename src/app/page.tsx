@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { StationLegend } from '@/components/app/station-legend';
 import { FlightManifest } from '@/components/app/flight-manifest';
+import { runFlightSimulation } from '@/lib/optimizer';
 
 
 export default function Home() {
@@ -60,7 +61,7 @@ export default function Home() {
   const plansForActiveShift = useMemo(() => {
     return basePlans.map(p => {
         const shiftId = `${p.id}_${activeShift}`;
-        return calculatedPlans[shiftId] || { ...p, id: shiftId }; // Return calculated if exists, else a template
+        return calculatedPlans[shiftId] || { ...p, id: shiftId, steps: [] }; // Return calculated if exists, else a template
     });
   }, [basePlans, calculatedPlans, activeShift]);
   
@@ -81,6 +82,7 @@ export default function Home() {
     setActiveView('plans');
     setActiveShift('M');
 
+    // Timeout to allow UI to update to loading state
     setTimeout(() => {
       try {
         const initialPlans: FlightPlan[] = [
@@ -91,11 +93,26 @@ export default function Home() {
         ];
         
         setBasePlans(initialPlans);
+
+        const newCalculatedPlans: Record<string, FlightPlan> = {};
+        const shifts: ('M' | 'T')[] = ['M', 'T'];
+
+        for (const planTemplate of initialPlans) {
+            for (const shift of shifts) {
+                const itemsForShift = scenario.transportItems.filter(item => item.shift === shift);
+                const calculated = runFlightSimulation(planTemplate, itemsForShift, scenario, shift);
+                newCalculatedPlans[calculated.id] = calculated;
+            }
+        }
+        
+        setCalculatedPlans(newCalculatedPlans);
         saveScenarioToHistory(scenario);
-         toast({
+        
+        toast({
             title: 'Éxito',
-            description: 'Planes listos. Se están calculando las rutas para el turno de la Mañana.',
+            description: 'Planes para Mañana y Tarde calculados.',
           });
+          
       } catch (error) {
         console.error("Error setting up plans:", error);
         toast({
@@ -198,13 +215,6 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handlePlanUpdate = (updatedPlan: FlightPlan) => {
-    setCalculatedPlans(prev => ({
-      ...prev,
-      [updatedPlan.id]: updatedPlan,
-    }));
-  };
-
   const handlePlanSelection = (planId: string) => {
     const plan = calculatedPlans[planId];
      if (plan && plan.steps.length > 0) {
@@ -212,20 +222,29 @@ export default function Home() {
       setActiveView('map');
       setCurrentMapStep(0);
     } else {
-      // Potentially show a toast or handle case where plan is not ready
       toast({
         variant: 'destructive',
         title: 'Plan no disponible',
-        description: 'La ruta para este plan aún no ha sido calculada.',
+        description: 'La ruta para este plan está vacía o no ha sido calculada.',
       });
     }
   }
   
   const handleShiftChange = (shift: 'M' | 'T') => {
     setActiveShift(shift);
-    // When shift changes, deselect plan to avoid showing wrong data
-    setSelectedPlanId(null);
-    setActiveView('plans');
+    const currentBaseId = selectedPlanId?.split('_')[0];
+    if (currentBaseId) {
+        const newPlanId = `${currentBaseId}_${shift}`;
+        if (calculatedPlans[newPlanId]) {
+            setSelectedPlanId(newPlanId);
+        } else {
+             setSelectedPlanId(null);
+             setActiveView('plans');
+        }
+    } else {
+        setSelectedPlanId(null);
+        setActiveView('plans');
+    }
   }
 
   return (
@@ -292,9 +311,6 @@ export default function Home() {
                           <FlightPlanCard 
                             key={plan.id} 
                             plan={plan}
-                            scenario={scenario} 
-                            activeShift={activeShift}
-                            onPlanUpdate={handlePlanUpdate}
                             onSelectPlan={handlePlanSelection}
                             isSelected={selectedPlanId === plan.id}
                           />

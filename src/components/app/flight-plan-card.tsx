@@ -11,11 +11,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { FlightPlan, TransportItem, ScenarioData, FlightStep } from '@/lib/types';
+import type { FlightPlan, TransportItem, FlightStep } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { runFlightSimulation } from '@/lib/optimizer';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cn } from '@/lib/utils';
@@ -23,9 +22,6 @@ import { cn } from '@/lib/utils';
 
 interface FlightPlanCardProps {
   plan: FlightPlan;
-  scenario: ScenarioData;
-  activeShift: 'M' | 'T';
-  onPlanUpdate: (plan: FlightPlan) => void;
   onSelectPlan: (planId: string) => void;
   isSelected: boolean;
 }
@@ -36,60 +32,17 @@ const actionTranslations: Record<FlightStep['action'], string> = {
   TRAVEL: 'VIAJAR',
 };
 
-export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSelectPlan, isSelected }: FlightPlanCardProps) {
-  const [isLoading, setIsLoading] = useState(false);
+export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCardProps) {
+  const [isLoading, setIsLoading] = useState(false); // Kept for potential future use, but not driven by this component anymore.
   
   const strategy = useMemo(() => {
-     const baseId = plan.id.split('_')[0];
-     return baseId as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
+     const parts = plan.id.split('_');
+     return parts.slice(0, parts.length - 1).join('_');
   }, [plan.id]);
 
-  const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
-    setIsLoading(true);
-    const relevantItems = scenario.transportItems.filter(item => item.shift === shift);
-    
-    // Use the base plan properties from the initial setup
-     const planTemplate: FlightPlan = {
-      id: strategy, // Use the base strategy id
-      title: plan.title,
-      description: plan.description,
-      steps: [],
-      metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
-    };
-
-    if (relevantItems.length === 0) {
-      const emptyPlan: FlightPlan = {
-        ...planTemplate,
-        id: `${strategy}_${shift}`, // The final ID includes the shift
-      };
-      onPlanUpdate(emptyPlan);
-      setIsLoading(false);
-      return;
-    }
-
-    // Run simulation in a timeout to avoid blocking render thread
-    setTimeout(() => {
-        try {
-          // The simulation function should return a plan with the correct shift-specific ID
-          const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
-          onPlanUpdate(newPlan);
-        } catch (error) {
-          console.error(`Error generating plan for ${strategy}:`, error);
-        } finally {
-          setIsLoading(false);
-        }
-    }, 0);
-  }, [scenario, strategy, plan.title, plan.description, onPlanUpdate]);
-  
-  // This effect will run whenever the activeShift changes, or when the component mounts
-  useEffect(() => {
-     // Only calculate if the plan for this shift doesn't exist yet
-     if (!plan.steps || plan.steps.length === 0) {
-      generatePlanForShift(activeShift);
-     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeShift, scenario.transportItems]); 
-
+  const shift = useMemo(() => {
+    return plan.id.endsWith('_M') ? 'M' : 'T';
+  }, [plan.id]);
 
   const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
@@ -105,7 +58,7 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
   const exportToPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text(`${plan.title} (Turno ${activeShift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    doc.text(`${plan.title} (Turno ${shift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
     
     doc.setFontSize(11);
     const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Items: ${plan.metrics.itemsTransported} | Peso Máx: ${(plan.metrics.maxWeightRatio * 100).toFixed(0)}%`;
@@ -123,7 +76,7 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
       ]),
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
     });
-    doc.save(`plan_${strategy}_${activeShift}.pdf`);
+    doc.save(`plan_${strategy}_${shift}.pdf`);
   };
 
   const exportToExcel = () => {
@@ -153,7 +106,7 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `plan_${strategy}_${activeShift}.csv`);
+    link.setAttribute("download", `plan_${strategy}_${shift}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -234,17 +187,15 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
         <ScrollArea className="h-80">
-          {isLoading || !hasContent ? (
+          {isLoading ? (
              <div className='flex flex-col items-center justify-center h-full text-center p-4'>
-                {isLoading ? (
-                    <p className='text-center p-8 text-muted-foreground'>Calculando...</p>
-                ) : (
-                    <>
-                        <AlertTriangle className='h-10 w-10 text-muted-foreground/50 mb-2' />
-                        <p className='font-medium'>Sin datos para este turno</p>
-                        <p className='text-sm text-muted-foreground'>No hay items para el turno de la {activeShift === 'M' ? 'mañana' : 'tarde'}.</p>
-                    </>
-                )}
+                <p className='text-center p-8 text-muted-foreground'>Calculando...</p>
+             </div>
+          ) : !hasContent ? (
+             <div className='flex flex-col items-center justify-center h-full text-center p-4'>
+                <AlertTriangle className='h-10 w-10 text-muted-foreground/50 mb-2' />
+                <p className='font-medium'>Sin datos para este turno</p>
+                <p className='text-sm text-muted-foreground'>No hay items definidos para el turno de la {shift === 'M' ? 'mañana' : 'tarde'}.</p>
              </div>
           ) : (
           <Table>

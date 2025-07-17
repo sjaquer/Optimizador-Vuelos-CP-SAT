@@ -36,12 +36,26 @@ export function runFlightSimulation(
     shift: 'M' | 'T'
 ): FlightPlan {
 
-    // --- Key Change: Expand PAX items into individual items ---
+    const planTemplate: FlightPlan = {
+      id: basePlan.id,
+      title: basePlan.title,
+      description: basePlan.description,
+      steps: [],
+      metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
+    };
+
+    if (itemsToTransport.length === 0) {
+        return {
+            ...planTemplate,
+            id: `${basePlan.id}_${shift}`,
+        };
+    }
+
     const allItemsToPickup = deepCopy(itemsToTransport).flatMap(item => {
         if (item.type === 'PAX' && item.quantity > 1) {
             return Array.from({ length: item.quantity }, (_, i) => ({
                 ...item,
-                id: `${item.id}-${i}`, // Give each a unique ID
+                id: `${item.id}-${i}`,
                 quantity: 1,
                 description: `${item.area}-PAX`,
             }));
@@ -57,15 +71,14 @@ export function runFlightSimulation(
     
     const strategy: 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency' = basePlan.id as any;
 
-    const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + item.weight, 0); // Quantity is always 1 now
-    const getCurrentSeatCount = () => itemsInHelicopter.length; // Each item takes one "seat"
+    const getCurrentWeight = () => itemsInHelicopter.reduce((sum, item) => sum + item.weight, 0);
+    const getCurrentSeatCount = () => itemsInHelicopter.length;
     const getCurrentItemType = (): 'PAX' | 'CARGO' | null => itemsInHelicopter[0]?.type ?? null;
 
-    let emergencyExit = 0; // Failsafe to prevent infinite loops
+    let emergencyExit = 0;
     while ((allItemsToPickup.length > 0 || itemsInHelicopter.length > 0) && emergencyExit < 100) {
         emergencyExit++;
 
-        // 1. Drop off
         const itemsToDrop = itemsInHelicopter.filter(p => p.destinationStation === currentStation);
         if (itemsToDrop.length > 0) {
             itemsInHelicopter = itemsInHelicopter.filter(p => !itemsToDrop.find(dp => dp.id === p.id));
@@ -73,7 +86,6 @@ export function runFlightSimulation(
             steps.push({ action: 'DROPOFF', station: currentStation, items: itemsToDrop, notes: `Desembarque de ${itemsToDrop.length} item(s).` });
         }
 
-        // 2. Pick up - respecting segregation
         const currentTypeInHeli = getCurrentItemType();
         const pickupableTypes = currentTypeInHeli ? [currentTypeInHeli] : ['PAX', 'CARGO'];
 
@@ -91,7 +103,7 @@ export function runFlightSimulation(
 
         const pickedUpItems: TransportItem[] = [];
         for (const item of itemsAvailableAtStation) {
-            const seatsAfterPickup = getCurrentSeatCount() + 1; // Each item is 1 "seat"
+            const seatsAfterPickup = getCurrentSeatCount() + 1;
             const weightAfterPickup = getCurrentWeight() + item.weight;
 
             if ((itemsInHelicopter.length === 0 || item.type === getCurrentItemType()) &&
@@ -111,18 +123,15 @@ export function runFlightSimulation(
         
         maxWeightRatio = Math.max(maxWeightRatio, getCurrentWeight() / scenario.helicopterMaxWeight);
 
-        // 3. Decide next move
         if (allItemsToPickup.length === 0 && itemsInHelicopter.length === 0) break;
 
         let nextStation = -1;
         
-        // Priority 1: Drop off items currently in helicopter
         if (itemsInHelicopter.length > 0) {
             const dropoffStations = [...new Set(itemsInHelicopter.map(p => p.destinationStation))];
             nextStation = getNextClosestStation(currentStation, dropoffStations);
         }
 
-        // Priority 2: If empty, or after dropoff, pick up something new
         if (nextStation === -1 && allItemsToPickup.length > 0) {
             let potentialPickups = allItemsToPickup;
             if (strategy === 'pax_priority') {
@@ -141,15 +150,14 @@ export function runFlightSimulation(
             steps.push({ action: 'TRAVEL', station: nextStation, items: deepCopy(itemsInHelicopter), notes: `Volando de E-${currentStation} a E-${nextStation}` });
             currentStation = nextStation;
         } else if (itemsInHelicopter.length > 0 && currentStation !== 0) {
-            // Failsafe: Stuck with items, must return to base
             steps.push({ action: 'TRAVEL', station: 0, items: deepCopy(itemsInHelicopter), notes: `Failsafe: Regresando a base desde E-${currentStation}.` });
             currentStation = 0;
         } else {
-            break; // No more moves possible
+            break; 
         }
     }
 
-    if (currentStation !== 0 && steps.length > 0) {
+    if (currentStation !== 0 && steps.length > 0 && steps[steps.length - 1]?.station !== 0) {
         steps.push({ action: 'TRAVEL', station: 0, items: [], notes: 'Regreso final a la base.' });
     }
     
