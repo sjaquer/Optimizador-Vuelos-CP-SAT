@@ -40,19 +40,16 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
   const [isLoading, setIsLoading] = useState(false);
   
   const strategy = useMemo(() => {
-     // The base plan ID is just the strategy name, e.g., 'pax_priority'
-     // The calculated plan ID has a shift suffix, e.g., 'pax_priority_M'
-     return plan.id.split('_')[0] as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
+     const baseId = plan.id.split('_')[0];
+     return baseId as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
   }, [plan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
     setIsLoading(true);
-    // Correctly filter items for the given shift from the main scenario data
     const relevantItems = scenario.transportItems.filter(item => item.shift === shift);
     
-    // Create a temporary base plan with the correct strategy but empty steps
     const planTemplate: FlightPlan = {
-      id: strategy, // Use the base ID for calculation
+      id: strategy,
       title: plan.title,
       description: plan.description,
       steps: [],
@@ -62,24 +59,26 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     if (relevantItems.length === 0) {
       const emptyPlan: FlightPlan = {
         ...planTemplate,
-        id: `${strategy}_${shift}`, // Add shift to ID
+        id: `${strategy}_${shift}`,
       };
       onPlanUpdate(emptyPlan);
       setIsLoading(false);
       return;
     }
 
-    // Run simulation in a timeout to avoid blocking UI thread on initial render
     setTimeout(() => {
-        const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
-        onPlanUpdate(newPlan);
-        setIsLoading(false);
+        try {
+          const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
+          onPlanUpdate(newPlan);
+        } catch (error) {
+          console.error(`Error generating plan for ${strategy}:`, error);
+        } finally {
+          setIsLoading(false);
+        }
     }, 0);
   }, [scenario, strategy, plan.title, plan.description, onPlanUpdate]);
   
   useEffect(() => {
-    // This effect now correctly triggers a recalculation whenever the active shift changes
-    // or if the underlying scenario items change.
     generatePlanForShift(activeShift);
   }, [activeShift, scenario.transportItems, generatePlanForShift]); 
 
@@ -169,7 +168,6 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     )
   }
   
-  // The displayed plan is the one from props, which is already the correct one for the active shift.
   const displayedPlan = plan;
   const hasContent = displayedPlan.steps.length > 0;
   
