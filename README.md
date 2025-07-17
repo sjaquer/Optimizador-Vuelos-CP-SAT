@@ -25,7 +25,7 @@
 
 ## 🧠 Descripción General
 
-**OVH (Optimizador de Vuelo de Helicópteros)** es una aplicación web avanzada desarrollada con Next.js, React y TypeScript, diseñada para resolver el complejo problema de la planificación logística de transporte aéreo. La herramienta permite a los usuarios definir escenarios de transporte (pasajeros y carga), capacidades de helicópteros y múltiples estaciones para generar planes de vuelo optimizados.
+**ORDEV (Optimizador de Vuelo de Helicópteros)** es una aplicación web avanzada desarrollada con Next.js, React y TypeScript, diseñada para resolver el complejo problema de la planificación logística de transporte aéreo. La herramienta permite a los usuarios definir escenarios de transporte (pasajeros y carga), capacidades de helicópteros y múltiples estaciones para generar planes de vuelo optimizados.
 
 El sistema presenta múltiples propuestas de ruta, cada una enfocada en una estrategia diferente (eficiencia, prioridad de pasajeros, etc.), y las visualiza en un mapa interactivo junto a un manifiesto de vuelo detallado para cada parada.
 
