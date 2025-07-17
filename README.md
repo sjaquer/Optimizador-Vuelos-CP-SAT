@@ -6,7 +6,11 @@
   </svg>
 </p>
 
+<<<<<<< HEAD
 # ORDEV - Optimizador de Vuelo de Helicópteros
+=======
+# OVH por sjaquer - Optimizador de Vuelo de Helicópteros
+>>>>>>> 2624048 (Creame el readme del proyecto que se vea profesional y de una manera con)
 
 > **“Planes de vuelo inteligentes, decisiones más rápidas.”**
 
@@ -25,7 +29,11 @@
 
 ## 🧠 Descripción General
 
+<<<<<<< HEAD
 **ORDEV (Optimizador de Vuelo de Helicópteros)** es una aplicación web avanzada desarrollada con Next.js, React y TypeScript, diseñada para resolver el complejo problema de la planificación logística de transporte aéreo. La herramienta permite a los usuarios definir escenarios de transporte (pasajeros y carga), capacidades de helicópteros y múltiples estaciones para generar planes de vuelo optimizados.
+=======
+**OVH (Optimizador de Vuelo de Helicópteros)** es una aplicación web avanzada desarrollada con Next.js, React y TypeScript, diseñada para resolver el complejo problema de la planificación logística de transporte aéreo. La herramienta permite a los usuarios definir escenarios de transporte (pasajeros y carga), capacidades de helicópteros y múltiples estaciones para generar planes de vuelo optimizados.
+>>>>>>> 2624048 (Creame el readme del proyecto que se vea profesional y de una manera con)
 
 El sistema presenta múltiples propuestas de ruta, cada una enfocada en una estrategia diferente (eficiencia, prioridad de pasajeros, etc.), y las visualiza en un mapa interactivo junto a un manifiesto de vuelo detallado para cada parada.
 
@@ -141,4 +149,8 @@ Este proyecto está bajo la Licencia MIT. Puedes usarlo, modificarlo y distribui
 
 ## 👨‍💻 Autor
 
+<<<<<<< HEAD
 Desarrollado con dedicación por **sjaquer**.
+=======
+Desarrollado con dedicación por **sjaquer**.
+>>>>>>> 2624048 (Creame el readme del proyecto que se vea profesional y de una manera con)
