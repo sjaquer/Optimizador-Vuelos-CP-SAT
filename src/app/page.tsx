@@ -58,7 +58,10 @@ export default function Home() {
   }, [selectedPlanId, calculatedPlans]);
 
   const plansForActiveShift = useMemo(() => {
-    return basePlans.map(p => calculatedPlans[`${p.id}_${activeShift}`] || p)
+    return basePlans.map(p => {
+        const shiftId = `${p.id}_${activeShift}`;
+        return calculatedPlans[shiftId] || { ...p, id: shiftId }; // Return calculated if exists, else a template
+    });
   }, [basePlans, calculatedPlans, activeShift]);
   
 
@@ -203,30 +206,26 @@ export default function Home() {
   };
 
   const handlePlanSelection = (planId: string) => {
-    setSelectedPlanId(planId);
     const plan = calculatedPlans[planId];
-    if (plan && plan.steps.length > 0) {
+     if (plan && plan.steps.length > 0) {
+      setSelectedPlanId(planId);
       setActiveView('map');
       setCurrentMapStep(0);
     } else {
-      setActiveView('plans');
+      // Potentially show a toast or handle case where plan is not ready
+      toast({
+        variant: 'destructive',
+        title: 'Plan no disponible',
+        description: 'La ruta para este plan aún no ha sido calculada.',
+      });
     }
   }
   
   const handleShiftChange = (shift: 'M' | 'T') => {
     setActiveShift(shift);
-    // If a plan is selected, try to switch to the corresponding plan in the new shift
-    if (selectedPlanId) {
-        const baseId = selectedPlanId.substring(0, selectedPlanId.lastIndexOf('_'));
-        const newPlanId = `${baseId}_${shift}`;
-        if (calculatedPlans[newPlanId]) {
-            setSelectedPlanId(newPlanId);
-        } else {
-            // If the new plan doesn't exist yet, deselect
-            setSelectedPlanId(null);
-            setActiveView('plans');
-        }
-    }
+    // When shift changes, deselect plan to avoid showing wrong data
+    setSelectedPlanId(null);
+    setActiveView('plans');
   }
 
   return (
@@ -372,5 +371,3 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
     </div>
   );
 }
-
-    

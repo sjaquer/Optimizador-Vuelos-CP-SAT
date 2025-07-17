@@ -48,8 +48,9 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     setIsLoading(true);
     const relevantItems = scenario.transportItems.filter(item => item.shift === shift);
     
-    const planTemplate: FlightPlan = {
-      id: strategy,
+    // Use the base plan properties from the initial setup
+     const planTemplate: FlightPlan = {
+      id: strategy, // Use the base strategy id
       title: plan.title,
       description: plan.description,
       steps: [],
@@ -59,15 +60,17 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     if (relevantItems.length === 0) {
       const emptyPlan: FlightPlan = {
         ...planTemplate,
-        id: `${strategy}_${shift}`,
+        id: `${strategy}_${shift}`, // The final ID includes the shift
       };
       onPlanUpdate(emptyPlan);
       setIsLoading(false);
       return;
     }
 
+    // Run simulation in a timeout to avoid blocking render thread
     setTimeout(() => {
         try {
+          // The simulation function should return a plan with the correct shift-specific ID
           const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
           onPlanUpdate(newPlan);
         } catch (error) {
@@ -78,9 +81,14 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     }, 0);
   }, [scenario, strategy, plan.title, plan.description, onPlanUpdate]);
   
+  // This effect will run whenever the activeShift changes, or when the component mounts
   useEffect(() => {
-    generatePlanForShift(activeShift);
-  }, [activeShift, scenario.transportItems, generatePlanForShift]); 
+     // Only calculate if the plan for this shift doesn't exist yet
+     if (!plan.steps || plan.steps.length === 0) {
+      generatePlanForShift(activeShift);
+     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeShift, scenario.transportItems]); 
 
 
   const getActionIcon = (action: FlightStep['action']) => {
@@ -226,12 +234,17 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
         <ScrollArea className="h-80">
-          {isLoading ? <p className='text-center p-8 text-muted-foreground'>Calculando...</p> : 
-          !hasContent ? (
+          {isLoading || !hasContent ? (
              <div className='flex flex-col items-center justify-center h-full text-center p-4'>
-                <AlertTriangle className='h-10 w-10 text-muted-foreground/50 mb-2' />
-                <p className='font-medium'>Sin datos para este turno</p>
-                <p className='text-sm text-muted-foreground'>No hay items para el turno de la {activeShift === 'M' ? 'mañana' : 'tarde'}.</p>
+                {isLoading ? (
+                    <p className='text-center p-8 text-muted-foreground'>Calculando...</p>
+                ) : (
+                    <>
+                        <AlertTriangle className='h-10 w-10 text-muted-foreground/50 mb-2' />
+                        <p className='font-medium'>Sin datos para este turno</p>
+                        <p className='text-sm text-muted-foreground'>No hay items para el turno de la {activeShift === 'M' ? 'mañana' : 'tarde'}.</p>
+                    </>
+                )}
              </div>
           ) : (
           <Table>
