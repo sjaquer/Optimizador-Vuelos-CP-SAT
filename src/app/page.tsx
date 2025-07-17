@@ -14,8 +14,8 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Bot, Map, ListCollapse, Wind, Upload, Package, Users } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
 import { ThemeToggle } from '@/components/app/theme-toggle';
@@ -40,9 +40,12 @@ export default function Home() {
     operationalNotes: '',
   });
 
-  const [generatedPlans, setGeneratedPlans] = useState<FlightPlan[]>([]);
+  const [basePlans, setBasePlans] = useState<FlightPlan[]>([]);
+  const [calculatedPlans, setCalculatedPlans] = useState<Record<string, FlightPlan>>({});
+
   const [isLoading, setIsLoading] = useState(false);
   const [activeView, setActiveView] = useState('plans'); // 'plans' or 'map'
+  const [activeShift, setActiveShift] = useState<'M' | 'T'>('M');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentMapStep, setCurrentMapStep] = useState(0);
 
@@ -51,8 +54,13 @@ export default function Home() {
   
   const selectedPlan = useMemo(() => {
     if (!selectedPlanId) return null;
-    return generatedPlans.find(p => p.id === selectedPlanId) || null;
-  }, [selectedPlanId, generatedPlans]);
+    return calculatedPlans[selectedPlanId] || null;
+  }, [selectedPlanId, calculatedPlans]);
+
+  const plansForActiveShift = useMemo(() => {
+    return basePlans.map(p => calculatedPlans[`${p.id}_${activeShift}`] || p)
+  }, [basePlans, calculatedPlans, activeShift]);
+  
 
   const handleGeneratePlans = () => {
     if (scenario.transportItems.length === 0) {
@@ -64,9 +72,11 @@ export default function Home() {
         return;
     }
     setIsLoading(true);
-    setGeneratedPlans([]);
+    setBasePlans([]);
+    setCalculatedPlans({});
     setSelectedPlanId(null);
     setActiveView('plans');
+    setActiveShift('M');
 
     setTimeout(() => {
       try {
@@ -77,13 +87,11 @@ export default function Home() {
             { id: 'cargo_priority', title: 'Propuesta D: Prioridad Carga', description: 'Busca la eficiencia dando preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
         ];
         
-        setGeneratedPlans(initialPlans);
-        setSelectedPlanId(initialPlans[0].id); 
-        
+        setBasePlans(initialPlans);
         saveScenarioToHistory(scenario);
          toast({
             title: 'Éxito',
-            description: 'Escenario listo. Selecciona un turno en cada tarjeta para ver los planes.',
+            description: 'Planes listos. Se están calculando las rutas para el turno de la Mañana.',
           });
       } catch (error) {
         console.error("Error setting up plans:", error);
@@ -188,45 +196,36 @@ export default function Home() {
   };
 
   const handlePlanUpdate = (updatedPlan: FlightPlan) => {
-    setGeneratedPlans(currentPlans => {
-      const baseId = updatedPlan.id.substring(0, updatedPlan.id.lastIndexOf('_'));
-      const index = currentPlans.findIndex(cp => cp.id.startsWith(baseId));
-      
-      if (index !== -1) {
-        const newPlans = [...currentPlans];
-        newPlans[index] = {
-            ...newPlans[index],
-            id: updatedPlan.id,
-            steps: updatedPlan.steps,
-            metrics: updatedPlan.metrics,
-        };
-        
-        // --- THIS IS THE KEY FIX ---
-        // If the updated plan's base ID matches the currently selected plan's base ID,
-        // then update the selectedPlanId to the new, specific ID (e.g., with the '_T' suffix).
-        if(selectedPlanId && selectedPlanId.startsWith(baseId)) {
-            setSelectedPlanId(updatedPlan.id);
-            // If the new plan has steps, switch to the map view automatically
-            if (updatedPlan.steps.length > 0) {
-              setActiveView('map');
-              setCurrentMapStep(0);
-            }
-        }
-
-        return newPlans;
-      }
-      return currentPlans;
-    });
+    setCalculatedPlans(prev => ({
+      ...prev,
+      [updatedPlan.id]: updatedPlan,
+    }));
   };
 
   const handlePlanSelection = (planId: string) => {
     setSelectedPlanId(planId);
-    const plan = generatedPlans.find(p => p.id === planId);
+    const plan = calculatedPlans[planId];
     if (plan && plan.steps.length > 0) {
       setActiveView('map');
       setCurrentMapStep(0);
     } else {
       setActiveView('plans');
+    }
+  }
+  
+  const handleShiftChange = (shift: 'M' | 'T') => {
+    setActiveShift(shift);
+    // If a plan is selected, try to switch to the corresponding plan in the new shift
+    if (selectedPlanId) {
+        const baseId = selectedPlanId.substring(0, selectedPlanId.lastIndexOf('_'));
+        const newPlanId = `${baseId}_${shift}`;
+        if (calculatedPlans[newPlanId]) {
+            setSelectedPlanId(newPlanId);
+        } else {
+            // If the new plan doesn't exist yet, deselect
+            setSelectedPlanId(null);
+            setActiveView('plans');
+        }
     }
   }
 
@@ -258,10 +257,22 @@ export default function Home() {
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
             {isLoading && <WelcomeScreen isLoading={true} />}
-            {!isLoading && generatedPlans.length === 0 && <WelcomeScreen isLoading={false} />}
-            {!isLoading && generatedPlans.length > 0 && (
+            {!isLoading && basePlans.length === 0 && <WelcomeScreen isLoading={false} />}
+            {!isLoading && basePlans.length > 0 && (
               <div className="flex flex-col gap-8">
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-between">
+                    <div className='flex items-center gap-2'>
+                        <CalendarDays className='h-5 w-5 text-muted-foreground' />
+                        <Select value={activeShift} onValueChange={(value) => handleShiftChange(value as 'M' | 'T')}>
+                            <SelectTrigger className="w-[130px] h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="M">Turno Mañana</SelectItem>
+                              <SelectItem value="T">Turno Tarde</SelectItem>
+                            </SelectContent>
+                          </Select>
+                    </div>
                     <div className="flex items-center gap-2 rounded-md bg-muted p-1">
                       <Button variant={activeView === 'plans' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveView('plans')} className="h-8">
                         <ListCollapse className="mr-2 h-4 w-4" />
@@ -276,13 +287,14 @@ export default function Home() {
                 {activeView === 'plans' ? (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Propuestas de Vuelo Mixto</h2>
+                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Propuestas de Vuelo Mixto - Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}</h2>
                       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                        {generatedPlans.map((plan) => (
+                        {plansForActiveShift.map((plan) => (
                           <FlightPlanCard 
                             key={plan.id} 
-                            basePlan={plan} 
+                            plan={plan}
                             scenario={scenario} 
+                            activeShift={activeShift}
                             onPlanUpdate={handlePlanUpdate}
                             onSelectPlan={handlePlanSelection}
                             isSelected={selectedPlanId === plan.id}
@@ -306,9 +318,9 @@ export default function Home() {
                               <SelectValue placeholder="Seleccionar un plan" />
                             </SelectTrigger>
                             <SelectContent>
-                               {generatedPlans.filter(p => p.steps.length > 0).map((plan) => (
-                                 <SelectItem key={plan.id} value={plan.id}>
-                                  {plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})
+                               {Object.values(calculatedPlans).filter(p => p.steps.length > 0 && p.id.endsWith(activeShift)).map((p) => (
+                                 <SelectItem key={p.id} value={p.id}>
+                                  {p.title} (Turno {p.id.endsWith('M') ? 'Mañana' : 'Tarde'})
                                  </SelectItem>
                                ))}
                             </SelectContent>
@@ -360,3 +372,5 @@ function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
     </div>
   );
 }
+
+    

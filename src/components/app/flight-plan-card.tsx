@@ -11,13 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { FlightPlan, TransportItem, ScenarioData, FlightStep } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, User, Wind, Milestone, FileDown, ArrowRight, Waypoints, Package, AlertTriangle, Scale } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,8 +22,9 @@ import { cn } from '@/lib/utils';
 
 
 interface FlightPlanCardProps {
-  basePlan: FlightPlan;
+  plan: FlightPlan;
   scenario: ScenarioData;
+  activeShift: 'M' | 'T';
   onPlanUpdate: (plan: FlightPlan) => void;
   onSelectPlan: (planId: string) => void;
   isSelected: boolean;
@@ -42,14 +36,12 @@ const actionTranslations: Record<FlightStep['action'], string> = {
   TRAVEL: 'VIAJAR',
 };
 
-export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan, isSelected }: FlightPlanCardProps) {
-  const [activeShift, setActiveShift] = useState<'M' | 'T'>('M');
-  const [currentPlan, setCurrentPlan] = useState<FlightPlan>(basePlan);
+export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSelectPlan, isSelected }: FlightPlanCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-
+  
   const strategy = useMemo(() => {
-     return basePlan.id as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
-  }, [basePlan.id]);
+     return plan.id.split('_')[0] as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
+  }, [plan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
     setIsLoading(true);
@@ -58,8 +50,8 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     // Create a temporary base plan with the correct strategy but empty steps
     const planTemplate: FlightPlan = {
       id: strategy, // Use the base ID for calculation
-      title: basePlan.title,
-      description: basePlan.description,
+      title: plan.title,
+      description: plan.description,
       steps: [],
       metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 },
     };
@@ -69,33 +61,28 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
         ...planTemplate,
         id: `${strategy}_${shift}`, // Add shift to ID
       };
-      setCurrentPlan(emptyPlan);
       onPlanUpdate(emptyPlan);
       setIsLoading(false);
       return;
     }
 
-    const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
-    setCurrentPlan(newPlan);
-    onPlanUpdate(newPlan);
-    setIsLoading(false);
+    // Run simulation in a timeout to avoid blocking UI thread on initial render
+    setTimeout(() => {
+        const newPlan = runFlightSimulation(planTemplate, relevantItems, scenario, shift);
+        onPlanUpdate(newPlan);
+        setIsLoading(false);
+    }, 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario, basePlan.id, basePlan.title, basePlan.description, strategy]); // onPlanUpdate is removed intentionally
+  }, [scenario.transportItems, strategy, plan.title, plan.description]); // onPlanUpdate removed intentionally
   
   useEffect(() => {
-    // Generate the plan for the default shift ('M') when the component mounts or dependencies change
-    generatePlanForShift('M');
-    setActiveShift('M');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario.transportItems, basePlan.id]); // Re-run only if items or base plan ID change
-
-
-  const handleShiftChange = (shift: 'M' | 'T') => {
-    if (shift !== activeShift || !currentPlan.id.endsWith(shift)) {
-        setActiveShift(shift);
-        generatePlanForShift(shift);
+    // Generate plan if it hasn't been calculated for the active shift yet
+    if (!plan.id.endsWith(activeShift)) {
+        generatePlanForShift(activeShift);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeShift, scenario.transportItems, plan.id]); 
+
 
   const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
@@ -111,16 +98,16 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   const exportToPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text(`${currentPlan.title} (Turno ${activeShift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    doc.text(`${plan.title} (Turno ${activeShift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
     
     doc.setFontSize(11);
-    const metricsText = `Paradas: ${currentPlan.metrics.totalStops} | Tramos: ${currentPlan.metrics.totalDistance} | Items: ${currentPlan.metrics.itemsTransported} | Peso Máx: ${(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%`;
+    const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Items: ${plan.metrics.itemsTransported} | Peso Máx: ${(plan.metrics.maxWeightRatio * 100).toFixed(0)}%`;
     doc.text(metricsText, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
     
     autoTable(doc, {
       startY: 40,
       head: [['Paso', 'Acción', 'Estación', 'Items', 'Notas']],
-      body: currentPlan.steps.map((step, index) => [
+      body: plan.steps.map((step, index) => [
         index + 1,
         getActionLabel(step.action),
         step.station === 0 ? 'Base' : `E-${step.station}`,
@@ -134,7 +121,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
 
   const exportToExcel = () => {
     const headers = ['Paso', 'Acción', 'Estación', 'Area', 'Tipo', 'Cantidad', 'Prioridad', 'Peso', 'Descripción', 'Notas'];
-    const rows = currentPlan.steps.flatMap((step, index) => {
+    const rows = plan.steps.flatMap((step, index) => {
         if (step.items.length === 0) {
             return [[index + 1, getActionLabel(step.action), step.station === 0 ? 'Base' : `E-${step.station}`, '', '', '', '', '', '', step.notes]];
         }
@@ -182,29 +169,29 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     )
   }
   
-  const hasContent = currentPlan.steps.length > 0;
+  const hasContent = plan.steps.length > 0;
   
   const handleSelection = () => {
     if (hasContent) {
-        onSelectPlan(currentPlan.id);
+        onSelectPlan(plan.id);
     }
   }
 
   const paxDeliveredCount = useMemo(() => {
-     return currentPlan.steps
+     return plan.steps
       .filter(s => s.action === 'DROPOFF')
       .flatMap(s => s.items)
       .filter(i => i.type === 'PAX')
       .reduce((sum, item) => sum + item.quantity, 0);
-  }, [currentPlan]);
+  }, [plan]);
 
   const cargoDeliveredCount = useMemo(() => {
-     return currentPlan.steps
+     return plan.steps
       .filter(s => s.action === 'DROPOFF')
       .flatMap(s => s.items)
       .filter(i => i.type === 'CARGO')
       .reduce((sum, item) => sum + item.quantity, 0);
-  }, [currentPlan]);
+  }, [plan]);
 
 
   return (
@@ -212,22 +199,12 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
       <CardHeader>
         <div className='flex items-start justify-between gap-4'>
             <div className='flex-1'>
-              <CardTitle className='text-xl'>{currentPlan.title}</CardTitle>
-              {currentPlan.description && <CardDescription className='mt-1'>{currentPlan.description}</CardDescription>}
+              <CardTitle className='text-xl'>{plan.title}</CardTitle>
+              {plan.description && <CardDescription className='mt-1'>{plan.description}</CardDescription>}
             </div>
-            <div className='flex items-center gap-2'>
-              <Select value={activeShift} onValueChange={(value) => handleShiftChange(value as 'M' | 'T')}>
-                <SelectTrigger className="w-[120px] h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="M">Mañana</SelectItem>
-                  <SelectItem value="T">Tarde</SelectItem>
-                </SelectContent>
-              </Select>
-              <DropdownMenu>
+             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="icon" variant="ghost" className='h-9 w-9' disabled={!hasContent} onClick={(e) => e.stopPropagation()}>
+                  <Button size="icon" variant="ghost" className='h-9 w-9' disabled={!hasContent || isLoading} onClick={(e) => e.stopPropagation()}>
                     <FileDown className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -236,15 +213,14 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
                   <DropdownMenuItem onClick={exportToExcel}>Descargar Excel (CSV)</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
         </div>
-        {hasContent && (
+        {hasContent && !isLoading && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{currentPlan.metrics.totalStops} Paradas</span></div>
-              <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{currentPlan.metrics.totalDistance} Tramos</span></div>
+              <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{plan.metrics.totalStops} Paradas</span></div>
+              <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{plan.metrics.totalDistance} Tramos</span></div>
               {paxDeliveredCount > 0 && <div className="flex items-center gap-1"><User className="h-4 w-4" /><span>{paxDeliveredCount} PAX</span></div>}
               {cargoDeliveredCount > 0 && <div className="flex items-center gap-1"><Package className="h-4 w-4" /><span>{cargoDeliveredCount} Cargas</span></div>}
-              <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(currentPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
+              <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(plan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
             </div>
         )}
       </CardHeader>
@@ -263,7 +239,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
               <TableRow><TableHead className="w-[80px]">Acción</TableHead><TableHead>Estación</TableHead><TableHead>Items</TableHead><TableHead>Notas</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {currentPlan.steps.map((step, index) => (
+              {plan.steps.map((step, index) => (
                 <TableRow key={index}>
                   <TableCell><div className="flex items-center gap-2 font-medium">{getActionIcon(step.action)}<span>{getActionLabel(step.action)}</span></div></TableCell>
                   <TableCell>{step.station === 0 ? 'Base' : `Estación ${step.station}`}</TableCell>
@@ -283,3 +259,5 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     </Card>
   );
 }
+
+    
