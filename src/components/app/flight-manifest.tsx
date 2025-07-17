@@ -17,24 +17,35 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
   const flightPath = useMemo(() => plan.steps.filter(s => s.action === 'TRAVEL'), [plan]);
   
   const manifestData = useMemo(() => {
-    if (flightPath.length === 0) return null;
+    if (!plan || flightPath.length === 0) return null;
 
-    const legIndex = Math.min(currentStep, flightPath.length - 1);
+    // Ensure currentStep is within bounds of the flight path
+    const legIndex = Math.max(0, Math.min(currentStep, flightPath.length - 1));
     const currentTravelStep = flightPath[legIndex];
     if (!currentTravelStep) return null;
 
+    const startStationId = legIndex > 0 ? flightPath[legIndex - 1].station : 0;
     const endStationId = currentTravelStep.station;
-    const startStationId = legIndex > 0 
-      ? flightPath[legIndex - 1].station 
-      : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
 
-    // Find all actions (PICKUP/DROPOFF) that occurred at the end station
-    // after the previous travel step and before or at the current travel step's index in the full plan.
-    const allStepsIndex = plan.steps.findIndex(s => s === currentTravelStep);
-    const prevTravelStepIndex = legIndex > 0 ? plan.steps.findIndex(s => s === flightPath[legIndex - 1]) : -1;
+    // Find the index of the current travel step in the full plan
+    const currentTravelStepIndex = plan.steps.findIndex(step => step === currentTravelStep);
     
-    const relevantActions = plan.steps.slice(prevTravelStepIndex + 1, allStepsIndex + 1);
+    // Find the index of the previous travel step. If it's the first leg, the "previous" is before the first step.
+    const prevTravelStepIndex = legIndex > 0 
+        ? plan.steps.findIndex(step => step === flightPath[legIndex - 1]) 
+        : -1;
+
+    // The relevant actions are those that happen AFTER the previous travel step
+    // and UP TO AND INCLUDING the current travel step, plus any subsequent actions
+    // at the same destination station before the next travel leg.
+    let endSliceIndex = plan.steps.length;
+    if (legIndex + 1 < flightPath.length) {
+        const nextTravelStep = flightPath[legIndex + 1];
+        endSliceIndex = plan.steps.findIndex(step => step === nextTravelStep);
+    }
     
+    const relevantActions = plan.steps.slice(prevTravelStepIndex + 1, endSliceIndex);
+
     const dropoffs = relevantActions
         .filter(s => s.action === 'DROPOFF' && s.station === endStationId)
         .flatMap(s => s.items);
