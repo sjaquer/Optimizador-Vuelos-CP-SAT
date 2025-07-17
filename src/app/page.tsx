@@ -319,15 +319,15 @@ export default function Home() {
                     </div>
                   </div>
                 ) : selectedPlan && (
-                  <div className='grid grid-cols-1 xl:grid-cols-[1fr_500px] gap-6'>
-                    <RouteMap 
+                  <div className='grid grid-cols-1 xl:grid-cols-[300px_1fr_300px] gap-6 items-start'>
+                     <StationLegend />
+                     <RouteMap 
                         plan={selectedPlan} 
                         currentStep={currentMapStep}
                         onStepChange={setCurrentMapStep}
                     />
                     <div className='flex flex-col gap-6'>
-                      <div className='flex items-center gap-4'>
-                        <span className='text-sm font-medium'>Visualizando:</span>
+                       <div className='flex items-center gap-4'>
                          <Select value={selectedPlan.id} onValueChange={(planId) => handlePlanSelection(planId)}>
                             <SelectTrigger className="w-auto flex-1">
                               <SelectValue placeholder="Seleccionar un plan" />
@@ -335,16 +335,13 @@ export default function Home() {
                             <SelectContent>
                                {Object.values(calculatedPlans).filter(p => p.steps.length > 0 && p.id.endsWith(activeShift)).map((p) => (
                                  <SelectItem key={p.id} value={p.id}>
-                                  {p.title} (Turno {p.id.endsWith('M') ? 'Mañana' : 'Tarde'})
+                                  {p.title}
                                  </SelectItem>
                                ))}
                             </SelectContent>
                           </Select>
                       </div>
-                       <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4'>
-                          <StationLegend />
-                          <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
-                       </div>
+                      <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
                     </div>
                   </div>
                 )}

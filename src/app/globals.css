@@ -86,3 +86,44 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  @keyframes draw-line {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .animate-draw {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: draw-line 1s ease-out forwards;
+  }
+
+  @keyframes station-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.3);
+      opacity: 0.7;
+    }
+  }
+  .animate-station-pulse {
+    animation: station-pulse 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes manifest-item-in {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .animate-manifest-item-in {
+    animation: manifest-item-in 0.5s ease-out forwards;
+  }
+}

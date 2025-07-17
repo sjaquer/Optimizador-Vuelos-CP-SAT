@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { FlightPlan } from '@/lib/types';
 import { Wind } from 'lucide-react';
@@ -35,28 +35,24 @@ const stationCoords: Record<number, Point> = {
 
 export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
   const flightPath = useMemo(() => plan.steps.filter(s => s.action === 'TRAVEL'), [plan]);
+  const [animationKey, setAnimationKey] = useState(0);
 
-  const helicopterPosition = useMemo(() => {
-    if (flightPath.length === 0) {
-      return stationCoords[0];
-    }
-    const legIndex = Math.min(currentStep, flightPath.length - 1);
-    const endStationId = flightPath[legIndex]?.station ?? 0;
-    
-    return stationCoords[endStationId] || stationCoords[0];
-  }, [currentStep, flightPath]);
-
-  // Reset step to 0 when the plan changes
+  // Reset step to 0 and trigger re-animation when the plan changes
   useEffect(() => {
     onStepChange(0);
+    setAnimationKey(prev => prev + 1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.id]);
+
+  useEffect(() => {
+    setAnimationKey(prev => prev + 1);
+  }, [currentStep]);
 
   return (
     <Card className="flex flex-col">
       <CardContent className="flex-1 flex flex-col items-center gap-6 p-4">
         <div className="relative w-full aspect-[4/3] bg-muted/20 rounded-lg">
-          <svg viewBox="0 0 800 600" className="relative z-10 w-full h-full">
+          <svg viewBox="0 0 800 600" className="relative z-10 w-full h-full overflow-visible">
             <defs>
               <marker
                 id="arrowhead"
@@ -76,6 +72,9 @@ export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
               const start = stationCoords[startStationId];
               const end = stationCoords[endStationId];
               if (!start || !end) return null;
+              
+              const isCurrentLeg = index === currentStep;
+
               return (
                  <line
                     key={`path-bg-${index}`}
@@ -90,57 +89,60 @@ export function RouteMap({ plan, currentStep, onStepChange }: RouteMapProps) {
               )
             })}
             
-            {flightPath.slice(0, currentStep + 1).map((leg, index) => {
-              const startStationId = index > 0 ? flightPath[index - 1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
-              const endStationId = leg.station;
-              const start = stationCoords[startStationId];
-              const end = stationCoords[endStationId];
-              if (!start || !end) return null;
-              
-              const isCurrentLeg = index === currentStep;
+            {(() => {
+                if (flightPath.length === 0) return null;
+                const legIndex = Math.min(currentStep, flightPath.length - 1);
+                const startStationId = legIndex > 0 ? flightPath[legIndex - 1].station : plan.steps.find(s => s.action !== 'TRAVEL')?.station ?? 0;
+                const endStationId = flightPath[legIndex].station;
+
+                const start = stationCoords[startStationId];
+                const end = stationCoords[endStationId];
+
+                if (!start || !end) return null;
+
+                return (
+                     <line
+                        key={`${animationKey}-path-active`}
+                        x1={start.x}
+                        y1={start.y}
+                        x2={end.x}
+                        y2={end.y}
+                        className="stroke-primary animate-draw"
+                        strokeWidth="4"
+                        markerEnd="url(#arrowhead)"
+                      />
+                )
+            })()}
+
+            
+            {Object.entries(stationCoords).map(([id, coords]) => {
+              const endStationId = flightPath[currentStep]?.station;
+              const isCurrentDestination = Number(id) === endStationId;
 
               return (
-                <line
-                  key={`path-active-${index}`}
-                  x1={start.x}
-                  y1={start.y}
-                  x2={end.x}
-                  y2={end.y}
-                  className="stroke-primary transition-all duration-300"
-                  strokeWidth={isCurrentLeg ? "4" : "2"}
-                  markerEnd={isCurrentLeg ? "url(#arrowhead)" : "none"}
-                />
-              );
+                 <g key={id} transform={`translate(${coords.x}, ${coords.y})`}>
+                   <circle
+                    cx="0"
+                    cy="0"
+                    r={id === '0' ? '12' : '10'}
+                    className={id === '0' ? 'fill-primary stroke-primary-foreground' : 'fill-card stroke-primary'}
+                    strokeWidth="2"
+                  />
+                   {isCurrentDestination && <circle cx="0" cy="0" r="12" className="fill-primary/50 animate-station-pulse" />}
+                   <text
+                    x="0"
+                    y="1"
+                    textAnchor="middle"
+                    dy="0.3em"
+                    className={id === '0' ? 'fill-primary-foreground font-bold' : 'fill-primary font-bold'}
+                    fontSize="12"
+                  >
+                    {id}
+                  </text>
+                </g>
+              )
             })}
-            
-            {Object.entries(stationCoords).map(([id, coords]) => (
-              <g key={id} transform={`translate(${coords.x}, ${coords.y})`}>
-                 <circle
-                  cx="0"
-                  cy="0"
-                  r={id === '0' ? '12' : '10'}
-                  className={id === '0' ? 'fill-primary stroke-primary-foreground' : 'fill-card stroke-primary'}
-                  strokeWidth="2"
-                />
-                 <text
-                  x="0"
-                  y="1"
-                  textAnchor="middle"
-                  dy="0.3em"
-                  className={id === '0' ? 'fill-primary-foreground font-bold' : 'fill-primary font-bold'}
-                  fontSize="12"
-                >
-                  {id}
-                </text>
-              </g>
-            ))}
 
-            <g 
-              className="transition-transform duration-500 ease-in-out" 
-              transform={`translate(${helicopterPosition.x}, ${helicopterPosition.y})`}
-            >
-                <Wind className="h-10 w-10 text-primary drop-shadow-lg -translate-x-5 -translate-y-5" />
-            </g>
           </svg>
         </div>
         {flightPath.length > 0 && (
