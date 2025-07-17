@@ -48,7 +48,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   const [isLoading, setIsLoading] = useState(false);
 
   const strategy = useMemo(() => {
-     return basePlan.id as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency';
+     return basePlan.id as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
   }, [basePlan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
@@ -57,7 +57,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     
     // Create a temporary base plan with the correct strategy but empty steps
     const planTemplate: FlightPlan = {
-      id: strategy,
+      id: strategy, // Use the base ID for calculation
       title: basePlan.title,
       description: basePlan.description,
       steps: [],
@@ -67,7 +67,7 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
     if (relevantItems.length === 0) {
       const emptyPlan: FlightPlan = {
         ...planTemplate,
-        id: `${strategy}_${shift}`,
+        id: `${strategy}_${shift}`, // Add shift to ID
       };
       setCurrentPlan(emptyPlan);
       onPlanUpdate(emptyPlan);
@@ -84,13 +84,14 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   
   useEffect(() => {
     // Generate the plan for the default shift ('M') when the component mounts or dependencies change
-    generatePlanForShift(activeShift);
+    generatePlanForShift('M');
+    setActiveShift('M');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenario.transportItems, basePlan.id]); // Re-run only if items or base plan ID change
 
 
   const handleShiftChange = (shift: 'M' | 'T') => {
-    if (shift !== activeShift) {
+    if (shift !== activeShift || !currentPlan.id.endsWith(shift)) {
         setActiveShift(shift);
         generatePlanForShift(shift);
     }
@@ -182,20 +183,12 @@ export function FlightPlanCard({ basePlan, scenario, onPlanUpdate, onSelectPlan,
   }
   
   const hasContent = currentPlan.steps.length > 0;
-  const itemTypesInPlan = useMemo(() => new Set(currentPlan.steps.flatMap(s => s.items).map(i => i.type)), [currentPlan]);
   
   const handleSelection = () => {
     if (hasContent) {
         onSelectPlan(currentPlan.id);
     }
   }
-
-  const itemsDeliveredCount = useMemo(() => {
-    return currentPlan.steps
-      .filter(s => s.action === 'DROPOFF')
-      .flatMap(s => s.items)
-      .reduce((sum, item) => sum + item.quantity, 0);
-  }, [currentPlan]);
 
   const paxDeliveredCount = useMemo(() => {
      return currentPlan.steps

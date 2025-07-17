@@ -71,14 +71,14 @@ export default function Home() {
     setTimeout(() => {
       try {
         const initialPlans: FlightPlan[] = [
-            { id: 'pax_priority', title: 'Propuesta A: Eficiencia con Prioridad PAX', description: 'Optimiza la ruta dando preferencia a los pasajeros, ideal para traslados urgentes de personal.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_priority', title: 'Propuesta B: Eficiencia con Prioridad Carga', description: 'Busca la eficiencia dando preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'mixed_efficiency', title: 'Propuesta C: Eficiencia de Ruta Pura', description: 'Busca la ruta más corta para entregar todos los ítems (PAX y Carga), ideal para ahorrar combustible y tiempo total.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'mixed_efficiency', title: 'Propuesta A: Eficiencia Mixta', description: 'Busca la ruta más corta para entregar todos los ítems (PAX y Carga), ideal para ahorrar combustible y tiempo total.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pure_efficiency', title: 'Propuesta B: Eficiencia de Ruta Pura', description: 'Encuentra la ruta más corta posible, optimizando cada tramo sin priorizar tipo de carga. Puede resultar en más vuelos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'pax_priority', title: 'Propuesta C: Prioridad PAX', description: 'Optimiza la ruta dando preferencia a los pasajeros, ideal para traslados urgentes de personal.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'cargo_priority', title: 'Propuesta D: Prioridad Carga', description: 'Busca la eficiencia dando preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
         ];
         
         setGeneratedPlans(initialPlans);
-        // We select the ID, but the actual plan will be populated by the card, which will then enable the map view.
-        setSelectedPlanId(initialPlans[0].id + '_M'); 
+        setSelectedPlanId(initialPlans[0].id); 
         
         saveScenarioToHistory(scenario);
          toast({
@@ -94,7 +94,6 @@ export default function Home() {
         });
       } finally {
          setIsLoading(false);
-         // Don't switch view yet, wait for a plan to be calculated
       }
     }, 500);
   };
@@ -113,39 +112,66 @@ export default function Home() {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
 
+        // --- Config Sheet Validation ---
         const configSheet = workbook.Sheets['Configuracion'];
         if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
-        const configData = XLSX.utils.sheet_to_json<{ Clave: string; Valor: any }>(configSheet);
-        const numStations = configData.find(row => row.Clave === 'numStations')?.Valor ?? 8;
-        const helicopterCapacity = configData.find(row => row.Clave === 'helicopterCapacity')?.Valor;
-        const helicopterMaxWeight = configData.find(row => row.Clave === 'helicopterMaxWeight')?.Valor;
-        if (numStations === undefined || helicopterCapacity === undefined || helicopterMaxWeight === undefined) throw new Error("Formato de 'Configuracion' incorrecto. Faltan numStations, helicopterCapacity o helicopterMaxWeight.");
-
+        const configJson = XLSX.utils.sheet_to_json<{ Clave: string; Valor: any }>(configSheet);
+        
+        const getConfigValue = (key: string) => {
+            const row = configJson.find(r => r.Clave === key);
+            if (row === undefined || row.Valor === undefined || row.Valor === '') throw new Error(`Falta el valor para '${key}' en la hoja 'Configuracion'.`);
+            return row.Valor;
+        };
+        const numStations = getConfigValue('numStations');
+        const helicopterCapacity = getConfigValue('helicopterCapacity');
+        const helicopterMaxWeight = getConfigValue('helicopterMaxWeight');
+        
+        // --- Items Sheet Validation ---
         const itemsSheet = workbook.Sheets['Items'];
         if (!itemsSheet) throw new Error("No se encontró la hoja 'Items'.");
-        const itemsData = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; cantidad?: number; origen: number; destino: number; peso?: number; descripcion?: string }>(itemsSheet);
+        const itemsJson = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; cantidad?: number; origen: number; destino: number; peso?: number; descripcion?: string }>(itemsSheet, { defval: "" });
 
-        const transportItems: TransportItem[] = itemsData.map((item, index) => ({
-          id: crypto.randomUUID(),
-          area: item.area,
-          type: item.tipo,
-          shift: item.turno,
-          priority: item.prioridad,
-          quantity: item.tipo === 'PAX' ? (item.cantidad ?? 1) : 1,
-          originStation: item.origen,
-          destinationStation: item.destino,
-          weight: item.tipo === 'PAX' ? 80 : (item.peso ?? 0),
-          description: item.descripcion || '',
-        }));
-        
-        if (transportItems.some(p => !p.area || !p.type || !p.shift || p.priority === undefined || p.originStation === undefined || p.destinationStation === undefined || p.weight === undefined)) {
-            throw new Error("La hoja 'Items' tiene filas con datos incompletos o incorrectos. Revisa que todas las columnas esten presentes (peso y descripcion son opcionales para PAX).");
-        }
+        const transportItems: TransportItem[] = itemsJson
+            .filter(item => item.area && item.area.toString().trim() !== '') // Ignore empty rows
+            .map((item, index) => {
+            const rowIndex = index + 2; // +1 for header, +1 for 0-based index
+
+            // General validations for required fields
+            if (!item.area) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'area'.`);
+            if (!item.tipo) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'tipo'.`);
+            if (item.tipo !== 'PAX' && item.tipo !== 'CARGO') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'tipo' debe ser 'PAX' o 'CARGO'.`);
+            if (!item.turno) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'turno'.`);
+            if (item.turno !== 'M' && item.turno !== 'T') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'turno' debe ser 'M' o 'T'.`);
+            if (item.prioridad === undefined || item.prioridad.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'prioridad'.`);
+            if (item.origen === undefined || item.origen.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'origen'.`);
+            if (item.destino === undefined || item.destino.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'destino'.`);
+            
+            // Type-specific validations
+            if (item.tipo === 'CARGO' && (item.peso === undefined || item.peso.toString() === '' || Number(item.peso) <= 0)) {
+                throw new Error(`Error en la fila ${rowIndex} de 'Items': La carga debe tener un 'peso' mayor a 0.`);
+            }
+            if (item.tipo === 'PAX' && (item.cantidad === undefined || item.cantidad.toString() === '' || Number(item.cantidad) <= 0)) {
+                throw new Error(`Error en la fila ${rowIndex} de 'Items': PAX debe tener una 'cantidad' mayor a 0.`);
+            }
+
+            return {
+              id: crypto.randomUUID(),
+              area: item.area,
+              type: item.tipo,
+              shift: item.turno,
+              priority: Number(item.prioridad),
+              quantity: item.tipo === 'PAX' ? Number(item.cantidad) : 1,
+              originStation: Number(item.origen),
+              destinationStation: Number(item.destino),
+              weight: item.tipo === 'PAX' ? 80 : Number(item.peso),
+              description: item.descripcion || '',
+            };
+        });
 
         setScenario({ 
-            numStations, 
-            helicopterCapacity, 
-            helicopterMaxWeight,
+            numStations: Number(numStations), 
+            helicopterCapacity: Number(helicopterCapacity), 
+            helicopterMaxWeight: Number(helicopterMaxWeight),
             transportItems, 
             weatherConditions: '',
             operationalNotes: '',
@@ -153,7 +179,7 @@ export default function Home() {
         toast({ title: 'Éxito', description: 'Datos del escenario importados correctamente.' });
       } catch (error) {
         console.error("Error al importar:", error);
-        toast({ variant: 'destructive', title: 'Error de Importación', description: error instanceof Error ? error.message : 'No se pudo procesar el archivo Excel.' });
+        toast({ variant: 'destructive', title: 'Error de Importación', description: error instanceof Error ? error.message : 'No se pudo procesar el archivo Excel.', duration: 9000 });
       } finally {
         if(event.target) event.target.value = '';
       }
@@ -163,15 +189,11 @@ export default function Home() {
 
   const handlePlanUpdate = (updatedPlan: FlightPlan) => {
     setGeneratedPlans(currentPlans => {
-      // The base ID is the part before the shift suffix (_M or _T)
       const baseId = updatedPlan.id.substring(0, updatedPlan.id.lastIndexOf('_'));
-      
       const index = currentPlans.findIndex(cp => cp.id.startsWith(baseId));
       
       if (index !== -1) {
         const newPlans = [...currentPlans];
-        // We replace the placeholder plan with the fully calculated one.
-        // We keep the original description and title but use the new ID, steps, and metrics.
         newPlans[index] = {
             ...newPlans[index],
             id: updatedPlan.id,
@@ -179,9 +201,16 @@ export default function Home() {
             metrics: updatedPlan.metrics,
         };
         
-        // If this updated plan is the currently selected one, reflect that.
+        // --- THIS IS THE KEY FIX ---
+        // If the updated plan's base ID matches the currently selected plan's base ID,
+        // then update the selectedPlanId to the new, specific ID (e.g., with the '_T' suffix).
         if(selectedPlanId && selectedPlanId.startsWith(baseId)) {
             setSelectedPlanId(updatedPlan.id);
+            // If the new plan has steps, switch to the map view automatically
+            if (updatedPlan.steps.length > 0) {
+              setActiveView('map');
+              setCurrentMapStep(0);
+            }
         }
 
         return newPlans;
@@ -190,7 +219,6 @@ export default function Home() {
     });
   };
 
-
   const handlePlanSelection = (planId: string) => {
     setSelectedPlanId(planId);
     const plan = generatedPlans.find(p => p.id === planId);
@@ -198,7 +226,6 @@ export default function Home() {
       setActiveView('map');
       setCurrentMapStep(0);
     } else {
-      // If plan has no steps, stay on plans view. This might happen if a shift has no items.
       setActiveView('plans');
     }
   }
@@ -265,30 +292,32 @@ export default function Home() {
                     </div>
                   </div>
                 ) : selectedPlan && (
-                  <div className='flex flex-col gap-6'>
-                    <div className='flex items-center gap-4'>
-                      <span className='text-sm font-medium'>Visualizando:</span>
-                       <Select value={selectedPlan.id} onValueChange={(planId) => handlePlanSelection(planId)}>
-                          <SelectTrigger className="w-[320px]">
-                            <SelectValue placeholder="Seleccionar un plan" />
-                          </SelectTrigger>
-                          <SelectContent>
-                             {generatedPlans.filter(p => p.steps.length > 0).map((plan) => (
-                               <SelectItem key={plan.id} value={plan.id}>
-                                {plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})
-                               </SelectItem>
-                             ))}
-                          </SelectContent>
-                        </Select>
-                    </div>
-                    <div className='grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4'>
-                        <StationLegend />
-                        <RouteMap 
-                            plan={selectedPlan} 
-                            currentStep={currentMapStep}
-                            onStepChange={setCurrentMapStep}
-                        />
-                        <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
+                  <div className='grid grid-cols-1 xl:grid-cols-[1fr_500px] gap-6'>
+                    <RouteMap 
+                        plan={selectedPlan} 
+                        currentStep={currentMapStep}
+                        onStepChange={setCurrentMapStep}
+                    />
+                    <div className='flex flex-col gap-6'>
+                      <div className='flex items-center gap-4'>
+                        <span className='text-sm font-medium'>Visualizando:</span>
+                         <Select value={selectedPlan.id} onValueChange={(planId) => handlePlanSelection(planId)}>
+                            <SelectTrigger className="w-auto flex-1">
+                              <SelectValue placeholder="Seleccionar un plan" />
+                            </SelectTrigger>
+                            <SelectContent>
+                               {generatedPlans.filter(p => p.steps.length > 0).map((plan) => (
+                                 <SelectItem key={plan.id} value={plan.id}>
+                                  {plan.title} (Turno {plan.id.endsWith('M') ? 'Mañana' : 'Tarde'})
+                                 </SelectItem>
+                               ))}
+                            </SelectContent>
+                          </Select>
+                      </div>
+                       <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4'>
+                          <StationLegend />
+                          <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
+                       </div>
                     </div>
                   </div>
                 )}
