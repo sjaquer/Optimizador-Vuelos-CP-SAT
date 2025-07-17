@@ -40,11 +40,14 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
   const [isLoading, setIsLoading] = useState(false);
   
   const strategy = useMemo(() => {
+     // The base plan ID is just the strategy name, e.g., 'pax_priority'
+     // The calculated plan ID has a shift suffix, e.g., 'pax_priority_M'
      return plan.id.split('_')[0] as 'pax_priority' | 'cargo_priority' | 'mixed_efficiency' | 'pure_efficiency';
   }, [plan.id]);
 
   const generatePlanForShift = useCallback((shift: 'M' | 'T') => {
     setIsLoading(true);
+    // Correctly filter items for the given shift from the main scenario data
     const relevantItems = scenario.transportItems.filter(item => item.shift === shift);
     
     // Create a temporary base plan with the correct strategy but empty steps
@@ -72,16 +75,13 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
         onPlanUpdate(newPlan);
         setIsLoading(false);
     }, 0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenario.transportItems, strategy, plan.title, plan.description]); // onPlanUpdate removed intentionally
+  }, [scenario, strategy, plan.title, plan.description, onPlanUpdate]);
   
   useEffect(() => {
-    // Generate plan if it hasn't been calculated for the active shift yet
-    if (!plan.id.endsWith(activeShift)) {
-        generatePlanForShift(activeShift);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeShift, scenario.transportItems, plan.id]); 
+    // This effect now correctly triggers a recalculation whenever the active shift changes
+    // or if the underlying scenario items change.
+    generatePlanForShift(activeShift);
+  }, [activeShift, scenario.transportItems, generatePlanForShift]); 
 
 
   const getActionIcon = (action: FlightStep['action']) => {
@@ -169,29 +169,31 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     )
   }
   
-  const hasContent = plan.steps.length > 0;
+  // The displayed plan is the one from props, which is already the correct one for the active shift.
+  const displayedPlan = plan;
+  const hasContent = displayedPlan.steps.length > 0;
   
   const handleSelection = () => {
     if (hasContent) {
-        onSelectPlan(plan.id);
+        onSelectPlan(displayedPlan.id);
     }
   }
 
   const paxDeliveredCount = useMemo(() => {
-     return plan.steps
+     return displayedPlan.steps
       .filter(s => s.action === 'DROPOFF')
       .flatMap(s => s.items)
       .filter(i => i.type === 'PAX')
       .reduce((sum, item) => sum + item.quantity, 0);
-  }, [plan]);
+  }, [displayedPlan]);
 
   const cargoDeliveredCount = useMemo(() => {
-     return plan.steps
+     return displayedPlan.steps
       .filter(s => s.action === 'DROPOFF')
       .flatMap(s => s.items)
       .filter(i => i.type === 'CARGO')
       .reduce((sum, item) => sum + item.quantity, 0);
-  }, [plan]);
+  }, [displayedPlan]);
 
 
   return (
@@ -199,8 +201,8 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
       <CardHeader>
         <div className='flex items-start justify-between gap-4'>
             <div className='flex-1'>
-              <CardTitle className='text-xl'>{plan.title}</CardTitle>
-              {plan.description && <CardDescription className='mt-1'>{plan.description}</CardDescription>}
+              <CardTitle className='text-xl'>{displayedPlan.title}</CardTitle>
+              {displayedPlan.description && <CardDescription className='mt-1'>{displayedPlan.description}</CardDescription>}
             </div>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -216,11 +218,11 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
         </div>
         {hasContent && !isLoading && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{plan.metrics.totalStops} Paradas</span></div>
-              <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{plan.metrics.totalDistance} Tramos</span></div>
+              <div className="flex items-center gap-1"><Milestone className="h-4 w-4" /><span>{displayedPlan.metrics.totalStops} Paradas</span></div>
+              <div className="flex items-center gap-1"><Wind className="h-4 w-4" /><span>{displayedPlan.metrics.totalDistance} Tramos</span></div>
               {paxDeliveredCount > 0 && <div className="flex items-center gap-1"><User className="h-4 w-4" /><span>{paxDeliveredCount} PAX</span></div>}
               {cargoDeliveredCount > 0 && <div className="flex items-center gap-1"><Package className="h-4 w-4" /><span>{cargoDeliveredCount} Cargas</span></div>}
-              <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(plan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
+              <div className="flex items-center gap-1"><Scale className="h-4 w-4" /><span>Peso Máx: {(displayedPlan.metrics.maxWeightRatio * 100).toFixed(0)}%</span></div>
             </div>
         )}
       </CardHeader>
@@ -239,7 +241,7 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
               <TableRow><TableHead className="w-[80px]">Acción</TableHead><TableHead>Estación</TableHead><TableHead>Items</TableHead><TableHead>Notas</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {plan.steps.map((step, index) => (
+              {displayedPlan.steps.map((step, index) => (
                 <TableRow key={index}>
                   <TableCell><div className="flex items-center gap-2 font-medium">{getActionIcon(step.action)}<span>{getActionLabel(step.action)}</span></div></TableCell>
                   <TableCell>{step.station === 0 ? 'Base' : `Estación ${step.station}`}</TableCell>
@@ -259,5 +261,3 @@ export function FlightPlanCard({ plan, scenario, activeShift, onPlanUpdate, onSe
     </Card>
   );
 }
-
-    
