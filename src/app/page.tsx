@@ -14,7 +14,7 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays, Milestone } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
@@ -29,6 +29,7 @@ import {
 import { StationLegend } from '@/components/app/station-legend';
 import { FlightManifest } from '@/components/app/flight-manifest';
 import { runFlightSimulation } from '@/lib/optimizer';
+import { FlightItinerary } from '@/components/app/flight-itinerary';
 
 
 export default function Home() {
@@ -45,7 +46,7 @@ export default function Home() {
   const [calculatedPlans, setCalculatedPlans] = useState<Record<string, FlightPlan>>({});
 
   const [isLoading, setIsLoading] = useState(false);
-  const [activeView, setActiveView] = useState('plans'); // 'plans' or 'map'
+  const [activeView, setActiveView] = useState('plans'); // 'plans', 'map', or 'itinerary'
   const [activeShift, setActiveShift] = useState<'M' | 'T'>('M');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentMapStep, setCurrentMapStep] = useState(0);
@@ -232,18 +233,48 @@ export default function Home() {
   
   const handleShiftChange = (shift: 'M' | 'T') => {
     setActiveShift(shift);
-    const currentBaseId = selectedPlanId?.split('_')[0];
-    if (currentBaseId) {
+    const currentBaseId = selectedPlanId?.split('_').slice(0, -1).join('_');
+
+    if (activeView !== 'plans' && currentBaseId) {
         const newPlanId = `${currentBaseId}_${shift}`;
-        if (calculatedPlans[newPlanId]) {
+        if (calculatedPlans[newPlanId] && calculatedPlans[newPlanId].steps.length > 0) {
             setSelectedPlanId(newPlanId);
         } else {
-             setSelectedPlanId(null);
-             setActiveView('plans');
+             // Try to select the first available plan for the new shift
+             const firstAvailablePlan = basePlans
+                .map(p => `${p.id}_${shift}`)
+                .find(id => calculatedPlans[id] && calculatedPlans[id].steps.length > 0);
+            
+            if (firstAvailablePlan) {
+                setSelectedPlanId(firstAvailablePlan);
+            } else {
+                setSelectedPlanId(null);
+                setActiveView('plans'); // No plans for this shift, go back to plans view
+            }
         }
     } else {
         setSelectedPlanId(null);
-        setActiveView('plans');
+        if (activeView !== 'plans') {
+            setActiveView('plans');
+        }
+    }
+  }
+
+  const handleViewChange = (view: 'plans' | 'map' | 'itinerary') => {
+    if (view !== 'plans' && !selectedPlanId) {
+       const firstAvailablePlan = plansForActiveShift.find(p => p.steps.length > 0);
+       if (firstAvailablePlan) {
+         setSelectedPlanId(firstAvailablePlan.id);
+         setActiveView(view);
+       } else {
+         toast({
+            variant: 'destructive',
+            title: 'No hay plan seleccionado',
+            description: 'No hay planes con rutas para mostrar en esta vista.',
+         })
+       }
+    } else {
+      setActiveView(view);
     }
   }
 
@@ -292,20 +323,25 @@ export default function Home() {
                           </Select>
                     </div>
                     <div className="flex items-center gap-2 rounded-md bg-muted p-1">
-                      <Button variant={activeView === 'plans' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveView('plans')} className="h-8">
+                      <Button variant={activeView === 'plans' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-8">
                         <ListCollapse className="mr-2 h-4 w-4" />
                         Planes
                       </Button>
-                      <Button variant={activeView === 'map' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveView('map')} className="h-8" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                       <Button variant={activeView === 'itinerary' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-8" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                        <Milestone className="mr-2 h-4 w-4" />
+                        Itinerario
+                      </Button>
+                      <Button variant={activeView === 'map' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="h-8" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
                         <Map className="mr-2 h-4 w-4" />
                         Ruta
                       </Button>
                     </div>
                 </div>
-                {activeView === 'plans' ? (
+
+                {activeView === 'plans' && (
                   <div className="space-y-8">
                     <div>
-                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Propuestas de Vuelo Mixto - Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}</h2>
+                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Propuestas de Vuelo - Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}</h2>
                       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                         {plansForActiveShift.map((plan) => (
                           <FlightPlanCard 
@@ -318,7 +354,11 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                ) : selectedPlan && (
+                )}
+                
+                {activeView === 'itinerary' && selectedPlan && <FlightItinerary plan={selectedPlan} />}
+
+                {activeView === 'map' && selectedPlan && (
                   <div className='grid grid-cols-1 xl:grid-cols-[300px_1fr_300px] gap-6 items-start'>
                      <StationLegend />
                      <RouteMap 
