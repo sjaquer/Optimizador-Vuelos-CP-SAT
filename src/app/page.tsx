@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useRef, useMemo, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import {
   SidebarProvider,
   Sidebar,
@@ -136,16 +136,40 @@ export default function Home() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+
+        const sheetToJson = (worksheet: ExcelJS.Worksheet) => {
+          const headerRow = worksheet.getRow(1);
+          const maxCol = headerRow.cellCount || 0;
+          const headers: string[] = [];
+          for (let c = 1; c <= maxCol; c++) {
+            const val = headerRow.getCell(c).value;
+            headers.push(val === null || val === undefined ? '' : String(val));
+          }
+          const rows: any[] = [];
+          worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const obj: any = {};
+            for (let c = 1; c <= maxCol; c++) {
+              const key = headers[c - 1];
+              if (!key) continue;
+              const cell = row.getCell(c).value;
+              obj[key] = cell && typeof cell === 'object' && 'text' in cell ? (cell as any).text : cell;
+            }
+            rows.push(obj);
+          });
+          return rows;
+        };
 
         // --- Config Sheet Validation ---
-        const configSheet = workbook.Sheets['Configuracion'];
+        const configSheet = workbook.getWorksheet('Configuracion');
         if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
-        const configJson = XLSX.utils.sheet_to_json<{ Clave: string; Valor: any }>(configSheet);
-        
+        const configJson = sheetToJson(configSheet) as { Clave: string; Valor: any }[];
+
         const getConfigValue = (key: string) => {
             const row = configJson.find(r => r.Clave === key);
             if (row === undefined || row.Valor === undefined || row.Valor === '') throw new Error(`Falta el valor para '${key}' en la hoja 'Configuracion'.`);
@@ -154,11 +178,11 @@ export default function Home() {
         const numStations = getConfigValue('numStations');
         const helicopterCapacity = getConfigValue('helicopterCapacity');
         const helicopterMaxWeight = getConfigValue('helicopterMaxWeight');
-        
+
         // --- Items Sheet Validation ---
-        const itemsSheet = workbook.Sheets['Items'];
+        const itemsSheet = workbook.getWorksheet('Items');
         if (!itemsSheet) throw new Error("No se encontró la hoja 'Items'.");
-        const itemsJson = XLSX.utils.sheet_to_json<{ area: string; tipo: 'PAX' | 'CARGO'; turno: 'M' | 'T'; prioridad: number; cantidad?: number; origen: number; destino: number; peso?: number; descripcion?: string }>(itemsSheet, { defval: "" });
+        const itemsJson = sheetToJson(itemsSheet) as any[];
 
         const transportItems: TransportItem[] = itemsJson
             .filter(item => item.area && item.area.toString().trim() !== '') // Ignore empty rows
