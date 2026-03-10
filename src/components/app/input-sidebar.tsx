@@ -53,6 +53,7 @@ const formSchema = z.object({
   numStations: z.coerce.number().min(1, 'Mínimo 1 estación'),
   helicopterCapacity: z.coerce.number().min(1, 'Capacidad mín. 1'),
   helicopterMaxWeight: z.coerce.number().min(1, 'Peso máx. mín. 1'),
+  paxDefaultWeight: z.coerce.number().min(1, 'Peso PAX mín. 1'),
   transportItems: z.array(transportItemSchema),
   weatherConditions: z.string().optional(),
   operationalNotes: z.string().optional(),
@@ -108,11 +109,12 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     form.trigger().then(isValid => {
       if (isValid) {
         const values = form.getValues();
+        const paxWeight = values.paxDefaultWeight || 80;
         const processedValues = {
             ...values,
             transportItems: values.transportItems.map(item => ({
                 ...item,
-                weight: item.type === 'PAX' ? 80 : item.weight!,
+                weight: item.type === 'PAX' ? paxWeight : item.weight!,
                 description: item.type === 'PAX' ? `Pasajero de ${item.area}`: item.description || '',
             }))
         };
@@ -147,18 +149,18 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     <Form {...form}>
       <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
         <div className="flex min-h-0 flex-1 flex-col">
-          <SidebarHeader className="group-data-[collapsible=icon]:hidden">
+          <SidebarHeader className="group-data-[collapsible=icon]:hidden border-b pb-4 mb-2 bg-muted/20">
               <div className='flex items-center justify-between'>
-                <h2 className='font-semibold'>Configurar Escenario</h2>
+                <h2 className='font-bold text-primary tracking-tight'>Control de Escenario</h2>
                 <Button
-                  variant={'ghost'}
+                  variant={activeView === 'history' ? 'default' : 'outline'}
                   size="icon"
-                  className='h-7 w-7'
+                  className='h-8 w-8 shadow-sm transition-all'
                   onClick={() => setActiveView(v => v === 'editor' ? 'history' : 'editor')}
                   type="button"
                   aria-label="Historial"
                 >
-                  <History />
+                  <History className="h-4 w-4" />
                 </Button>
               </div>
               <CurrentDateTime />
@@ -166,115 +168,74 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
           <div className="min-h-0 flex-1">
            <ScrollArea className="h-full">
-            <div className="space-y-4 p-2 group-data-[collapsible=icon]:hidden">
+            <div className="space-y-6 p-4 group-data-[collapsible=icon]:hidden">
                {activeView === 'editor' ? (
                 <>
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Condiciones del Vuelo</h3>
-                    <div className="space-y-4">
+                  <div className="bg-card border rounded-lg p-3 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5"><Wind className="h-3.5 w-3.5"/> Condiciones</h3>
+                    <div className="space-y-3">
                       <FormField control={form.control} name="weatherConditions" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Condiciones Climáticas</FormLabel>
-                            <FormControl><Textarea placeholder="Ej: Viento 15km/h..." {...field} /></FormControl>
+                            <FormControl><Input placeholder="Clima (Ej: Viento 15km/h NNO)" className="text-xs h-8 bg-background border-border" {...field} /></FormControl>
                           </FormItem>
                         )}/>
                       <FormField control={form.control} name="operationalNotes" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Notas Operacionales</FormLabel>
-                            <FormControl><Textarea placeholder="Ej: Priorizar carga frágil..." {...field} /></FormControl>
+                            <FormControl><Input placeholder="Notas operacionales o alertas..." className="text-xs h-8 bg-background border-border" {...field} /></FormControl>
                           </FormItem>
                         )}/>
                     </div>
                   </div>
 
-                  <div>
-                     <h3 className="text-sm font-medium mb-2">Configuración Helicóptero</h3>
-                     <div className="grid grid-cols-3 gap-2">
-                        <FormField control={form.control} name="numStations" render={({ field }) => ( <FormItem><FormLabel className="text-xs">Estaciones</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem> )}/>
-                        <FormField control={form.control} name="helicopterCapacity" render={({ field }) => ( <FormItem><FormLabel className="text-xs">Cap. Asientos</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem> )}/>
-                        <FormField control={form.control} name="helicopterMaxWeight" render={({ field }) => ( <FormItem><FormLabel className="text-xs">Peso Máx. (kg)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem> )}/>
+                  <div className="bg-card border rounded-lg p-3 shadow-sm">
+                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">Config. Aeronave</h3>
+                     <div className="grid grid-cols-2 gap-3">
+                        <FormField control={form.control} name="numStations" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Estaciones Activas</FormLabel><FormControl><Input type="number" className="h-8 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
+                        <FormField control={form.control} name="helicopterCapacity" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Capacidad (Asientos)</FormLabel><FormControl><Input type="number" className="h-8 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
+                        <FormField control={form.control} name="helicopterMaxWeight" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Carga Máxima (kg)</FormLabel><FormControl><Input type="number" className="h-8 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
+                        <FormField control={form.control} name="paxDefaultWeight" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Peso PAX Estándar</FormLabel><FormControl><Input type="number" className="h-8 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
                      </div>
-                     <FormMessage>{form.formState.errors.numStations?.message || form.formState.errors.helicopterCapacity?.message || form.formState.errors.helicopterMaxWeight?.message}</FormMessage>
+                     <FormMessage className="text-xs mt-2">{form.formState.errors.numStations?.message || form.formState.errors.helicopterCapacity?.message || form.formState.errors.helicopterMaxWeight?.message}</FormMessage>
                   </div>
                   
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Items a Transportar</h3>
-                    <div className="space-y-3">
+                  <div className="bg-card border rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">Requerimientos</h3>
+                    </div>
+                    <div className="space-y-4">
                       {fields.map((field, index) => {
                         const itemType = watchedItems[index]?.type;
                         const isPax = itemType === 'PAX';
                         return (
-                          <div key={field.id} className="flex flex-col gap-2 rounded-md border p-2 relative">
-                            <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 shrink-0" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                          <div key={field.id} className="flex flex-col gap-3 rounded-md bg-muted/30 border border-muted-foreground/20 p-3 relative group">
+                            <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 shrink-0 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove(index)}><Trash2 className="h-3 w-3" /></Button>
+                            
+                            <div className="flex items-center gap-2 pr-6">
+                              <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded">#{index + 1}</span>
+                              <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem className="flex-1 space-y-0.5"><FormControl><Input className="h-7 text-xs bg-background" placeholder="Área" {...field} /></FormControl></FormItem> )}/>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TIPO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-7 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGA</SelectItem></SelectContent></Select></FormItem> )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TRN</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-7 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="M">MAÑ</SelectItem><SelectItem value="T">TAR</SelectItem></SelectContent></Select></FormItem> )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PRIO</FormLabel><FormControl><Input type="number" min="1" max="5" className="h-7 text-xs bg-background" {...field} /></FormControl></FormItem> )}/>
+                            </div>
+                            
                             <div className="grid grid-cols-2 gap-2">
-                              <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem><FormLabel className="text-xs">Área</FormLabel><FormControl><Input {...field} /></FormControl></FormItem> )}/>
-                              <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem><FormLabel className="text-xs">Prioridad</FormLabel><FormControl><Input type="number" min="1" max="5" {...field} /></FormControl></FormItem> )}/>
+                               <FormField control={form.control} name={`transportItems.${index}.quantity`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">CANTIDAD</FormLabel><FormControl><Input type="number" min="1" placeholder="1" className="h-7 text-xs bg-background" {...field} disabled={!isPax} value={isPax ? field.value || 1 : 1} /></FormControl></FormItem> )}/>
+                               <FormField control={form.control} name={`transportItems.${index}.weight`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PESO (kg)</FormLabel><FormControl><Input type="number" className="h-7 text-xs bg-background" {...field} disabled={isPax} placeholder={isPax ? `${form.watch('paxDefaultWeight') || 80}` : '0'} value={isPax ? '' : field.value || ''} /></FormControl></FormItem> )}/>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => ( <FormItem><FormLabel className="text-xs">Tipo</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGO</SelectItem></SelectContent></Select></FormItem> )}/>
-                                <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => ( <FormItem><FormLabel className="text-xs">Turno</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="M">Mañana</SelectItem><SelectItem value="T">Tarde</SelectItem></SelectContent></Select></FormItem> )}/>
+                            
+                            {!isPax && (
+                              <FormField control={form.control} name={`transportItems.${index}.description`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormControl><Input placeholder="Describir carga..." className="h-7 text-xs bg-background" {...field} value={field.value || ''} /></FormControl></FormItem> )}/>
+                            )}
+
+                            <div className="flex items-center justify-between gap-2 bg-background p-1.5 rounded border border-border">
+                                <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><div className="flex items-center gap-1.5"><span className="text-[10px] font-medium text-muted-foreground w-6">ORG</span><FormControl><Input type="number" min="0" max={maxStation} className="h-6 text-xs" {...field} /></FormControl></div></FormItem> )}/>
+                                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><div className="flex items-center gap-1.5"><span className="text-[10px] font-medium text-muted-foreground w-6">DST</span><FormControl><Input type="number" min="0" max={maxStation} className="h-6 text-xs" {...field} /></FormControl></div></FormItem> )}/>
                             </div>
-                            <FormField 
-                                control={form.control} 
-                                name={`transportItems.${index}.description`} 
-                                render={({ field }) => ( 
-                                    <FormItem>
-                                        <FormLabel className="text-xs">Descripción</FormLabel>
-                                        <FormControl>
-                                            <Input 
-                                                placeholder={isPax ? 'Grupo de pasajeros (auto)' : 'Carga Frágil...'} 
-                                                {...field} 
-                                                disabled={isPax}
-                                                value={isPax ? '' : field.value || ''}
-                                            />
-                                        </FormControl>
-                                    </FormItem> 
-                                )}
-                            />
-                            <div className="grid grid-cols-2 gap-2">
-                               <FormField 
-                                  control={form.control} 
-                                  name={`transportItems.${index}.quantity`} 
-                                  render={({ field }) => ( 
-                                      <FormItem>
-                                          <FormLabel className="text-xs">{isPax ? "Cantidad" : "Cantidad"}</FormLabel>
-                                          <FormControl>
-                                              <Input 
-                                                  type="number" min="1"
-                                                  placeholder="1"
-                                                  {...field} 
-                                                  disabled={!isPax}
-                                                  value={isPax ? field.value || 1 : 1}
-                                              />
-                                          </FormControl>
-                                      </FormItem> 
-                                  )}
-                              />
-                               <FormField 
-                                  control={form.control} 
-                                  name={`transportItems.${index}.weight`} 
-                                  render={({ field }) => ( 
-                                      <FormItem>
-                                          <FormLabel className="text-xs">Peso (kg)</FormLabel>
-                                          <FormControl>
-                                              <Input 
-                                                  type="number" 
-                                                  {...field} 
-                                                  disabled={isPax}
-                                                  placeholder={isPax ? '80 (auto)' : '0'}
-                                                  value={isPax ? '' : field.value || ''}
-                                              />
-                                          </FormControl>
-                                      </FormItem> 
-                                  )}
-                              />
-                            </div>
-                            <div className="flex items-center justify-center gap-2">
-                                <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => ( <FormItem className="flex-1"><FormLabel className="text-xs">Origen (0=B)</FormLabel><FormControl><Input type="number" min="0" max={maxStation} {...field} /></FormControl></FormItem> )}/>
-                                <ArrowRight className="mt-5 h-4 w-4 text-muted-foreground" />
-                                <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => ( <FormItem className="flex-1"><FormLabel className="text-xs">Destino (0=B)</FormLabel><FormControl><Input type="number" min="0" max={maxStation} {...field} /></FormControl></FormItem> )}/>
-                            </div>
-                            <FormMessage>{form.formState.errors.transportItems?.[index]?.root?.message || form.formState.errors.transportItems?.[index]?.area?.message || form.formState.errors.transportItems?.[index]?.weight?.message || form.formState.errors.transportItems?.[index]?.quantity?.message}</FormMessage>
+                            <FormMessage className="text-[10px]">{form.formState.errors.transportItems?.[index]?.root?.message || form.formState.errors.transportItems?.[index]?.area?.message || form.formState.errors.transportItems?.[index]?.weight?.message || form.formState.errors.transportItems?.[index]?.quantity?.message}</FormMessage>
                           </div>
                         );
                       })}
@@ -318,11 +279,16 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
           </div>
         </div>
 
-        <SidebarFooter className="group-data-[collapsible=icon]:hidden">
-          <SidebarMenuButton type="submit" disabled={isLoading} className="w-full" tooltip="Generar Plan de Vuelo">
-            {isLoading ? <Wind className="animate-spin" /> : <Wind />}
-            <span className="group-data-[collapsible=icon]:hidden">Generar Plan de Vuelo</span>
-          </SidebarMenuButton>
+        <SidebarFooter className="group-data-[collapsible=icon]:hidden p-4 border-t bg-card/50">
+          <Button type="submit" disabled={isLoading} className="w-full h-11 font-bold shadow-md relative overflow-hidden group">
+            {isLoading ? (
+              <><Wind className="mr-2 h-5 w-5 animate-spin" /> Procesando Heurística...</>
+            ) : (
+              <span className="flex items-center justify-center relative z-10 transition-transform group-hover:gap-2">
+                 Calcular Plan Operativo <ArrowRight className="ml-2 h-5 w-5 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all" />
+              </span>
+            )}
+          </Button>
         </SidebarFooter>
       </form>
     </Form>

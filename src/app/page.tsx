@@ -14,7 +14,7 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays, Milestone } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays, Milestone, Plane } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
@@ -30,6 +30,7 @@ import { StationLegend } from '@/components/app/station-legend';
 import { FlightManifest } from '@/components/app/flight-manifest';
 import { runFlightSimulation } from '@/lib/optimizer';
 import { FlightItinerary } from '@/components/app/flight-itinerary';
+import { PlanComparisonChart } from '@/components/app/plan-comparison-chart';
 
 
 export default function Home() {
@@ -37,6 +38,7 @@ export default function Home() {
     numStations: 8,
     helicopterCapacity: 4,
     helicopterMaxWeight: 500,
+    paxDefaultWeight: 80,
     transportItems: [],
     weatherConditions: '',
     operationalNotes: '',
@@ -87,10 +89,10 @@ export default function Home() {
     setTimeout(() => {
       try {
         const initialPlans: FlightPlan[] = [
-            { id: 'mixed_efficiency', title: 'Propuesta A: Eficiencia Mixta', description: 'Busca la ruta más corta para entregar todos los ítems (PAX y Carga), ideal para ahorrar combustible y tiempo total.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pure_efficiency', title: 'Propuesta B: Eficiencia de Ruta Pura', description: 'Encuentra la ruta más corta posible, optimizando cada tramo sin priorizar tipo de carga. Puede resultar en más vuelos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'pax_priority', title: 'Propuesta C: Prioridad PAX', description: 'Optimiza la ruta dando preferencia a los pasajeros, ideal para traslados urgentes de personal.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
-            { id: 'cargo_priority', title: 'Propuesta D: Prioridad Carga', description: 'Busca la eficiencia dando preferencia a la entrega de la carga. Los pasajeros se transportan cuando no hay conflictos.', steps: [], metrics: { totalStops: 0, totalDistance: 0, itemsTransported: 0, totalWeight: 0, maxWeightRatio: 0 } },
+            { id: 'mixed_efficiency', title: 'Propuesta A: Eficiencia Mixta', description: 'Permite mezclar PAX y carga en el mismo vuelo, priorizando estaciones con más items. Maximiza uso de capacidad.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'pure_efficiency', title: 'Propuesta B: Ruta Más Corta', description: 'Optimiza la distancia total con mejora local 2-opt. No mezcla PAX y carga. Mejor distancia posible.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'pax_priority', title: 'Propuesta C: Prioridad PAX', description: 'Entrega primero a todos los pasajeros; la carga se transporta después. Ideal para traslados urgentes de personal.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'cargo_priority', title: 'Propuesta D: Prioridad Carga', description: 'Prioriza la entrega de carga pesada antes que PAX. Ideal cuando la carga es crítica para la operación.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
         ];
         
         setBasePlans(initialPlans);
@@ -216,7 +218,7 @@ export default function Home() {
               quantity: item.tipo === 'PAX' ? Number(item.cantidad) : 1,
               originStation: Number(item.origen),
               destinationStation: Number(item.destino),
-              weight: item.tipo === 'PAX' ? 80 : Number(item.peso),
+              weight: item.tipo === 'PAX' ? (scenario.paxDefaultWeight || 80) : Number(item.peso),
               description: item.descripcion || '',
             };
         });
@@ -225,6 +227,7 @@ export default function Home() {
             numStations: Number(numStations), 
             helicopterCapacity: Number(helicopterCapacity), 
             helicopterMaxWeight: Number(helicopterMaxWeight),
+            paxDefaultWeight: scenario.paxDefaultWeight || 80,
             transportItems, 
             weatherConditions: '',
             operationalNotes: '',
@@ -313,31 +316,41 @@ export default function Home() {
         />
       </Sidebar>
       <SidebarInset>
-        <div className="flex h-full flex-col">
-          <header className="flex h-14 items-center justify-between border-b bg-card/50 px-4">
+        <div className="flex h-full flex-col bg-background">
+          <header className="flex h-16 items-center justify-between border-b bg-card px-6 shadow-sm">
              <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <h1 className='font-semibold text-lg'>OVH por sjaquer - Optimización de Rutas</h1>
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+              <div className="h-6 w-px bg-border mx-2"></div>
+              <div className="flex items-center gap-2">
+                <div className="bg-primary/10 p-1.5 rounded-md">
+                  <Plane className="h-5 w-5 text-primary" />
+                </div>
+                <h1 className='font-bold text-lg tracking-tight'>Logística Aérea <span className="text-muted-foreground font-normal">| Panel de Optimización</span></h1>
+              </div>
             </div>
-            <div className='flex items-center gap-2'>
-              <Button variant="outline" size="sm" onClick={handleImportClick}>
+            <div className='flex items-center gap-3'>
+              <Button variant="outline" size="sm" onClick={handleImportClick} className="shadow-sm">
                   <Upload className="mr-2 h-4 w-4" />
                   Importar Excel
               </Button>
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls" className="hidden" />
+              <div className="h-6 w-px bg-border mx-1"></div>
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6">
+          <main className="flex-1 text-card-foreground overflow-auto p-4 md:p-8">
             {isLoading && <WelcomeScreen isLoading={true} />}
             {!isLoading && basePlans.length === 0 && <WelcomeScreen isLoading={false} />}
             {!isLoading && basePlans.length > 0 && (
               <div className="flex flex-col gap-8">
-                <div className="flex items-center justify-between">
-                    <div className='flex items-center gap-2'>
-                        <CalendarDays className='h-5 w-5 text-muted-foreground' />
+                <div className="flex items-center justify-between bg-card p-2 rounded-lg border shadow-sm">
+                    <div className='flex items-center gap-3 px-3'>
+                        <div className="bg-muted p-2 rounded-md">
+                          <CalendarDays className='h-4 w-4 text-primary' />
+                        </div>
+                        <span className="text-sm font-medium text-muted-foreground">Jornada:</span>
                         <Select value={activeShift} onValueChange={(value) => handleShiftChange(value as 'M' | 'T')}>
-                            <SelectTrigger className="w-[130px] h-9">
+                            <SelectTrigger className="w-[160px] h-9 font-semibold border-none shadow-none focus:ring-0 bg-transparent hover:bg-muted/50 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -346,26 +359,32 @@ export default function Home() {
                             </SelectContent>
                           </Select>
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-muted p-1">
-                      <Button variant={activeView === 'plans' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-8">
+                    <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1 border">
+                      <Button variant={activeView === 'plans' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-9 px-4 transition-all">
                         <ListCollapse className="mr-2 h-4 w-4" />
-                        Planes
+                        Análisis de Rutas
                       </Button>
-                       <Button variant={activeView === 'itinerary' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-8" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                       <Button variant={activeView === 'itinerary' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-9 px-4 transition-all" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
                         <Milestone className="mr-2 h-4 w-4" />
-                        Itinerario
+                        Desglose en Tabla
                       </Button>
-                      <Button variant={activeView === 'map' ? 'secondary' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="h-8" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                      <Button variant={activeView === 'map' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="h-9 px-4 transition-all" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
                         <Map className="mr-2 h-4 w-4" />
-                        Ruta
+                        Visor Satelital
                       </Button>
                     </div>
                 </div>
 
                 {activeView === 'plans' && (
-                  <div className="space-y-8">
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div>
-                      <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2"><Wind /> Propuestas de Vuelo - Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}</h2>
+                      <h2 className="text-xl font-bold tracking-tight mb-6 flex items-center gap-2 text-foreground">
+                        <Wind className="text-primary h-5 w-5" /> 
+                        Estrategias de Vuelo Calculadas
+                        <span className="ml-2 text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full border">
+                          Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}
+                        </span>
+                      </h2>
                       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                         {plansForActiveShift.map((plan) => (
                           <FlightPlanCard 
@@ -377,6 +396,7 @@ export default function Home() {
                         ))}
                       </div>
                     </div>
+                    <PlanComparisonChart plans={plansForActiveShift} />
                   </div>
                 )}
                 
@@ -384,9 +404,10 @@ export default function Home() {
 
                 {activeView === 'map' && selectedPlan && (
                   <div className='grid grid-cols-1 xl:grid-cols-[300px_1fr_300px] gap-6 items-start'>
-                     <StationLegend />
+                     <StationLegend numStations={scenario.numStations} />
                      <RouteMap 
-                        plan={selectedPlan} 
+                        plan={selectedPlan}
+                        numStations={scenario.numStations}
                         currentStep={currentMapStep}
                         onStepChange={setCurrentMapStep}
                     />
@@ -420,27 +441,35 @@ export default function Home() {
 
 function WelcomeScreen({ isLoading }: { isLoading: boolean }) {
   return (
-    <div className="flex h-full items-center justify-center">
-      <Card className="w-full max-w-lg text-center">
-        <CardContent className="p-8">
+    <div className="flex h-full items-center justify-center p-4">
+      <Card className="w-full max-w-2xl border-dashed shadow-sm">
+        <CardContent className="p-12">
           {isLoading ? (
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <Wind className="h-16 w-16 animate-spin text-primary" style={{ animationDuration: '3s' }} />
-                <Bot className="absolute inset-0 m-auto h-8 w-8 text-primary/80" />
+            <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
+              <div className="relative flex items-center justify-center h-24 w-24 bg-primary/5 rounded-full">
+                <Wind className="absolute inset-0 m-auto h-12 w-12 animate-spin text-primary/40" style={{ animationDuration: '4s' }} />
+                <Plane className="absolute inset-0 m-auto h-8 w-8 text-primary animate-pulse" />
               </div>
-              <h3 className="text-xl font-semibold">Generando Planes...</h3>
-              <p className="text-muted-foreground">
-                El motor de optimización está calculando las rutas. Por favor espera un momento.
-              </p>
+              <div className="space-y-2 text-center">
+                <h3 className="text-2xl font-bold tracking-tight">Procesando Escenario...</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  El motor de optimización heurística está calculando las mejores combinaciones de rutas 
+                  y carga para las estaciones activas.
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-4">
-              <Bot className="h-16 w-16 text-primary" />
-              <h3 className="text-xl font-semibold">Bienvenido, Roberto J. Jaque Culqui</h3>
-              <p className="text-muted-foreground">
-                Define tu escenario, importa datos y haz clic en "Generar Plan de Vuelo" para comenzar.
-              </p>
+            <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
+              <div className="h-20 w-20 bg-muted/50 rounded-2xl flex items-center justify-center border shadow-sm">
+                <Bot className="h-10 w-10 text-primary" />
+              </div>
+              <div className="space-y-3 text-center">
+                <h3 className="text-2xl font-bold tracking-tight">Motor de Planificación Heurística</h3>
+                <p className="text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  Sistema avanzado de enrutamiento para logística aérea. Define los parámetros del helicóptero 
+                  y carga tu archivo <strong className="font-medium text-foreground">Excel</strong> con los requerimientos operativos para comenzar el análisis.
+                </p>
+              </div>
             </div>
           )}
         </CardContent>

@@ -10,6 +10,7 @@ import type { FlightPlan, TransportItem, FlightStep } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
 
 interface FlightItineraryProps {
   plan: FlightPlan;
@@ -24,8 +25,8 @@ const actionTranslations: Record<FlightStep['action'], string> = {
 export function FlightItinerary({ plan }: FlightItineraryProps) {
   const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
-      case 'PICKUP': return <PlaneTakeoff className="h-4 w-4 text-green-600" />;
-      case 'DROPOFF': return <PlaneLanding className="h-4 w-4 text-blue-600" />;
+      case 'PICKUP': return <PlaneTakeoff className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      case 'DROPOFF': return <PlaneLanding className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
       case 'TRAVEL': return <Waypoints className="h-4 w-4 text-muted-foreground" />;
       default: return null;
     }
@@ -40,10 +41,11 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
     const quantityLabel = item.type === 'PAX' && item.quantity > 1 ? ` (x${item.quantity})` : '';
 
     return (
-       <Badge variant="secondary" className="font-normal h-6">
-          <Icon className="mr-1 h-3 w-3" />
-          {item.area}-{item.type}{quantityLabel} (P{item.priority})
-          <span className='mx-1.5 text-muted-foreground/80 flex items-center gap-0.5'>
+       <Badge variant="outline" className={`font-medium h-6 shadow-sm border-muted-foreground/20 ${item.type === 'PAX' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
+          <Icon className="mr-1.5 h-3 w-3" />
+          {item.area}-{item.type}{quantityLabel} 
+          <span className="opacity-70 font-normal ml-1">(P{item.priority})</span>
+          <span className='ml-2 pl-2 border-l border-current/20 flex items-center gap-1 opacity-80'>
             {originLabel} <ArrowRight className='h-3 w-3'/> {destLabel}
           </span>
        </Badge>
@@ -59,7 +61,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
     doc.text(`${plan.title} (Turno ${shift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
     
     doc.setFontSize(11);
-    const metricsText = `Paradas: ${plan.metrics.totalStops} | Tramos: ${plan.metrics.totalDistance} | Items: ${plan.metrics.itemsTransported} | Peso Máx: ${(plan.metrics.maxWeightRatio * 100).toFixed(0)}%`;
+    const metricsText = `Paradas: ${plan.metrics.totalStops} | Dist: ${plan.metrics.totalDistance.toFixed(1)} ud | Tramos: ${plan.metrics.totalLegs} | Items: ${plan.metrics.itemsTransported} | Vuelos: ${plan.metrics.totalFlights} | Carga prom: ${(plan.metrics.avgLoadRatio * 100).toFixed(0)}%`;
     doc.text(metricsText, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
     
     autoTable(doc, {
@@ -77,37 +79,58 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
     doc.save(`plan_${strategy}_${shift}.pdf`);
   };
 
-  const exportToExcel = () => {
-    const headers = ['Paso', 'Acción', 'Estación', 'Area', 'Tipo', 'Cantidad', 'Prioridad', 'Peso', 'Descripción', 'Notas'];
-    const rows = plan.steps.flatMap((step, index) => {
-        if (step.items.length === 0) {
-            return [[index + 1, getActionLabel(step.action), step.station === 0 ? 'Base' : `E-${step.station}`, '', '', '', '', '', '', step.notes]];
-        }
-        return step.items.map(item => [
-            index + 1,
-            getActionLabel(step.action),
-            step.station === 0 ? 'Base' : `E-${step.station}`,
-            item.area,
-            item.type,
-            item.quantity,
-            item.priority,
-            item.weight,
-            item.description,
-            step.notes
-        ]);
+  const exportToExcel = async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Itinerario');
+
+    ws.columns = [
+      { header: 'Paso', key: 'step', width: 8 },
+      { header: 'Acción', key: 'action', width: 14 },
+      { header: 'Estación', key: 'station', width: 14 },
+      { header: 'Área', key: 'area', width: 12 },
+      { header: 'Tipo', key: 'type', width: 10 },
+      { header: 'Cantidad', key: 'qty', width: 10 },
+      { header: 'Prioridad', key: 'priority', width: 10 },
+      { header: 'Peso (kg)', key: 'weight', width: 12 },
+      { header: 'Descripción', key: 'desc', width: 30 },
+      { header: 'Notas', key: 'notes', width: 30 },
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2980B5' } };
+
+    plan.steps.forEach((step, index) => {
+      if (step.items.length === 0) {
+        ws.addRow({ step: index + 1, action: getActionLabel(step.action), station: step.station === 0 ? 'Base' : `E-${step.station}`, notes: step.notes });
+      } else {
+        step.items.forEach(item => {
+          ws.addRow({
+            step: index + 1,
+            action: getActionLabel(step.action),
+            station: step.station === 0 ? 'Base' : `E-${step.station}`,
+            area: item.area,
+            type: item.type,
+            qty: item.quantity,
+            priority: item.priority,
+            weight: item.weight,
+            desc: item.description,
+            notes: step.notes,
+          });
+        });
+      }
     });
 
-    let csvContent = "data:text/csv;charset=utf-8," 
-      + headers.join(",") + "\n" 
-      + rows.map(e => e.join(",")).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `plan_${strategy}_${shift}.csv`);
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `plan_${strategy}_${shift}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -122,7 +145,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={exportToPDF}>Descargar PDF</DropdownMenuItem>
-              <DropdownMenuItem onClick={exportToExcel}>Descargar Excel (CSV)</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToExcel}>Descargar Excel (.xlsx)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
       </CardHeader>

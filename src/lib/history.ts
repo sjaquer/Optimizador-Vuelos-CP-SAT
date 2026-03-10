@@ -31,10 +31,6 @@ export const saveScenarioToHistory = (scenario: ScenarioData): void => {
       id: new Date().toISOString()
   };
 
-  // Prevent duplicates by checking if a very similar scenario exists.
-  // This is a simple check; more complex logic could be used.
-  history = history.filter(h => h.transportItems.length !== scenario.transportItems.length);
-
   const newHistory = [newScenarioWithId, ...history].slice(0, MAX_HISTORY_ITEMS);
   
   try {

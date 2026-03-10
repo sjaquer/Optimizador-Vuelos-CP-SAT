@@ -26,10 +26,14 @@ export interface FlightPlan {
   steps: FlightStep[];
   metrics: {
     totalStops: number;
-    totalDistance: number; 
+    totalDistance: number;
+    totalLegs: number;
     itemsTransported: number;
+    itemsNotDelivered: number;
     totalWeight: number;
     maxWeightRatio: number;
+    avgLoadRatio: number;
+    totalFlights: number;
   };
 }
 
@@ -38,6 +42,7 @@ export interface ScenarioData {
     numStations: number;
     helicopterCapacity: number;
     helicopterMaxWeight: number;
+    paxDefaultWeight: number;
     transportItems: TransportItem[];
     weatherConditions?: string;
     operationalNotes?: string;
