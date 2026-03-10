@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import type { ScenarioData } from '@/lib/types';
-import { Plus, Trash2, Wind, ArrowRight, History } from 'lucide-react';
+import { Plus, Trash2, Wind, ArrowRight, History, Users, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getHistory, deleteScenarioFromHistory } from '@/lib/history';
 import {
@@ -34,6 +34,7 @@ import {
 import { Textarea } from '../ui/textarea';
 import { CurrentDateTime } from './current-date-time';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { ALL_STATIONS, getActiveStations } from '@/lib/stations';
 
 
 const transportItemSchema = z.object({
@@ -207,11 +208,14 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                         const itemType = watchedItems[index]?.type;
                         const isPax = itemType === 'PAX';
                         return (
-                          <div key={field.id} className="flex flex-col gap-3 rounded-md bg-muted/30 border border-muted-foreground/20 p-3 relative group">
+                          <div key={field.id} className={`flex flex-col gap-3 rounded-md border p-3 relative group ${isPax ? 'bg-blue-500/5 border-blue-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
                             <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 shrink-0 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove(index)}><Trash2 className="h-3 w-3" /></Button>
                             
                             <div className="flex items-center gap-2 pr-6">
-                              <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded">#{index + 1}</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isPax ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
+                                {isPax ? <Users className="h-3 w-3" /> : <Package className="h-3 w-3" />}
+                                #{index + 1}
+                              </span>
                               <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem className="flex-1 space-y-0.5"><FormControl><Input className="h-7 text-xs bg-background" placeholder="Área" {...field} /></FormControl></FormItem> )}/>
                             </div>
 
@@ -231,9 +235,37 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                             )}
 
                             <div className="flex items-center justify-between gap-2 bg-background p-1.5 rounded border border-border">
-                                <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><div className="flex items-center gap-1.5"><span className="text-[10px] font-medium text-muted-foreground w-6">ORG</span><FormControl><Input type="number" min="0" max={maxStation} className="h-6 text-xs" {...field} /></FormControl></div></FormItem> )}/>
+                                <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => (
+                                  <FormItem className="flex-1 space-y-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-medium text-muted-foreground w-6">ORG</span>
+                                      <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}>
+                                        <FormControl><SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Origen" /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                          {getActiveStations(maxStation).map(s => (
+                                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </FormItem>
+                                )}/>
                                 <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><div className="flex items-center gap-1.5"><span className="text-[10px] font-medium text-muted-foreground w-6">DST</span><FormControl><Input type="number" min="0" max={maxStation} className="h-6 text-xs" {...field} /></FormControl></div></FormItem> )}/>
+                                <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => (
+                                  <FormItem className="flex-1 space-y-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-medium text-muted-foreground w-6">DST</span>
+                                      <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}>
+                                        <FormControl><SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Destino" /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                          {getActiveStations(maxStation).map(s => (
+                                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </FormItem>
+                                )}/>
                             </div>
                             <FormMessage className="text-[10px]">{form.formState.errors.transportItems?.[index]?.root?.message || form.formState.errors.transportItems?.[index]?.area?.message || form.formState.errors.transportItems?.[index]?.weight?.message || form.formState.errors.transportItems?.[index]?.quantity?.message}</FormMessage>
                           </div>

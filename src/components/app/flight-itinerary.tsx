@@ -11,6 +11,7 @@ import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileD
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
+import { stationNamesMap } from '@/lib/stations';
 
 interface FlightItineraryProps {
   plan: FlightPlan;
@@ -34,19 +35,19 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
 
   const getActionLabel = (action: FlightStep['action']) => actionTranslations[action] || action;
 
+  const sName = (id: number) => stationNamesMap[id] ?? `E-${id}`;
+
   const getItemLabel = (item: TransportItem) => {
-    const originLabel = item.originStation === 0 ? 'B' : item.originStation;
-    const destLabel = item.destinationStation === 0 ? 'B' : item.destinationStation;
     const Icon = item.type === 'PAX' ? User : Package;
     const quantityLabel = item.type === 'PAX' && item.quantity > 1 ? ` (x${item.quantity})` : '';
 
     return (
-       <Badge variant="outline" className={`font-medium h-6 shadow-sm border-muted-foreground/20 ${item.type === 'PAX' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
+       <Badge variant="outline" className={`font-medium h-auto py-1 shadow-sm border-muted-foreground/20 ${item.type === 'PAX' ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
           <Icon className="mr-1.5 h-3 w-3" />
           {item.area}-{item.type}{quantityLabel} 
           <span className="opacity-70 font-normal ml-1">(P{item.priority})</span>
-          <span className='ml-2 pl-2 border-l border-current/20 flex items-center gap-1 opacity-80'>
-            {originLabel} <ArrowRight className='h-3 w-3'/> {destLabel}
+          <span className='ml-2 pl-2 border-l border-current/20 flex items-center gap-1 opacity-80 text-[10px]'>
+            {sName(item.originStation)} <ArrowRight className='h-3 w-3'/> {sName(item.destinationStation)}
           </span>
        </Badge>
     );
@@ -70,7 +71,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
       body: plan.steps.map((step, index) => [
         index + 1,
         getActionLabel(step.action),
-        step.station === 0 ? 'Base' : `E-${step.station}`,
+        sName(step.station),
         step.items.map(p => `${p.area}-${p.type} ${p.type === 'PAX' && p.quantity > 1 ? `(x${p.quantity})` : ''} / ${p.type === 'CARGO' ? `${p.weight}kg` : ''}`).join('\n'),
         step.notes
       ]),
@@ -102,13 +103,13 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
 
     plan.steps.forEach((step, index) => {
       if (step.items.length === 0) {
-        ws.addRow({ step: index + 1, action: getActionLabel(step.action), station: step.station === 0 ? 'Base' : `E-${step.station}`, notes: step.notes });
+        ws.addRow({ step: index + 1, action: getActionLabel(step.action), station: sName(step.station), notes: step.notes });
       } else {
         step.items.forEach(item => {
           ws.addRow({
             step: index + 1,
             action: getActionLabel(step.action),
-            station: step.station === 0 ? 'Base' : `E-${step.station}`,
+            station: sName(step.station),
             area: item.area,
             type: item.type,
             qty: item.quantity,
@@ -170,7 +171,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
                     <span>{getActionLabel(step.action)}</span>
                   </div>
                 </TableCell>
-                <TableCell>{step.station === 0 ? 'Base' : `Estación ${step.station}`}</TableCell>
+                <TableCell>{sName(step.station)}</TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     {step.items.map((item) => (

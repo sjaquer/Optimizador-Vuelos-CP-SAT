@@ -4,7 +4,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { FlightPlan } from '@/lib/types';
-import { User, Wind, Milestone, Package, AlertTriangle, Scale, Route, Gauge, PlaneTakeoff } from 'lucide-react';
+import { User, Wind, Milestone, Package, AlertTriangle, Scale, Route, Gauge, PlaneTakeoff, ShieldCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +68,10 @@ export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCar
               </div>
               <div className="text-sm font-medium text-primary/80 mb-2">{displayedPlan.title.split(':')?.[1]?.trim() || ''}</div>
               {displayedPlan.description && <CardDescription className='text-xs leading-relaxed line-clamp-2'>{displayedPlan.description}</CardDescription>}
+              <div className="flex items-center gap-1.5 mt-2">
+                <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                <span className="text-[10px] text-muted-foreground">PAX y Carga en vuelos separados</span>
+              </div>
             </div>
         </div>
       </CardHeader>

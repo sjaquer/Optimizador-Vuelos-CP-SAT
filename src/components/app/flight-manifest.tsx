@@ -3,10 +3,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import type { FlightPlan, TransportItem } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, Users, Package, ArrowRight, Waypoints } from 'lucide-react';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
+import { stationNamesMap } from '@/lib/stations';
 
 interface FlightManifestProps {
   plan: FlightPlan;
@@ -54,6 +55,8 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
     };
   }, [currentStep, plan, flightPath]);
 
+  const sName = (id: number) => stationNamesMap[id] ?? `E-${id}`;
+
   const ItemBadge = ({ item, isPickup }: { item: TransportItem, isPickup: boolean }) => (
     <div 
         className={cn(
@@ -66,7 +69,11 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
       </div>
       <div className="flex flex-col flex-1 min-w-0">
         <span className="truncate leading-tight">{item.area} <span className="opacity-70 font-normal">| {item.type}</span></span>
-        <span className="text-[10px] opacity-70 flex gap-2"><span>Prio: {item.priority}</span> <span>{item.type === 'PAX' ? `${item.quantity} pax` : `${item.weight} kg`}</span></span>
+        <span className="text-[10px] opacity-70 flex gap-2">
+          <span>Prio: {item.priority}</span>
+          <span>{item.type === 'PAX' ? `${item.quantity} pax` : `${item.weight} kg`}</span>
+          <span>{sName(item.originStation)} → {sName(item.destinationStation)}</span>
+        </span>
       </div>
     </div>
   );
@@ -81,11 +88,17 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
       </CardHeader>
       <CardContent className="pt-6">
         {manifestData ? (
-          <div className="space-y-6">
-             <div className="flex items-center justify-center text-center bg-background border rounded-lg p-3 shadow-sm mx-auto max-w-[80%]">
-                <span className='font-bold text-lg'>{manifestData.previousStation === 0 ? 'Base' : `E-${manifestData.previousStation}`}</span>
-                <ArrowRight className="mx-4 h-5 w-5 text-muted-foreground shrink-0" />
-                <span className='font-bold text-lg text-primary'>{manifestData.station === 0 ? 'Base' : `E-${manifestData.station}`}</span>
+          <div className="space-y-5">
+             <div className="flex items-center justify-center text-center bg-background border rounded-lg p-3 shadow-sm mx-auto">
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-muted-foreground uppercase">Desde</span>
+                  <span className='font-bold text-sm'>{sName(manifestData.previousStation)}</span>
+                </div>
+                <ArrowRight className="mx-4 h-5 w-5 text-primary shrink-0" />
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-muted-foreground uppercase">Hacia</span>
+                  <span className='font-bold text-sm text-primary'>{sName(manifestData.station)}</span>
+                </div>
              </div>
              
              <ScrollArea className="h-72">

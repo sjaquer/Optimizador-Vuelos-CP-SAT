@@ -14,7 +14,7 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays, Milestone, Plane } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, Upload, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
@@ -89,10 +89,10 @@ export default function Home() {
     setTimeout(() => {
       try {
         const initialPlans: FlightPlan[] = [
-            { id: 'mixed_efficiency', title: 'Propuesta A: Eficiencia Mixta', description: 'Permite mezclar PAX y carga en el mismo vuelo, priorizando estaciones con más items. Maximiza uso de capacidad.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-            { id: 'pure_efficiency', title: 'Propuesta B: Ruta Más Corta', description: 'Optimiza la distancia total con mejora local 2-opt. No mezcla PAX y carga. Mejor distancia posible.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-            { id: 'pax_priority', title: 'Propuesta C: Prioridad PAX', description: 'Entrega primero a todos los pasajeros; la carga se transporta después. Ideal para traslados urgentes de personal.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-            { id: 'cargo_priority', title: 'Propuesta D: Prioridad Carga', description: 'Prioriza la entrega de carga pesada antes que PAX. Ideal cuando la carga es crítica para la operación.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'strict_priority', title: 'Plan A: Prioridad Estricta', description: 'Atiende primero los requerimientos de mayor prioridad (P1 antes que P2, etc.). PAX y CARGO van en vuelos separados. El tipo con el ítem más urgente vuela primero.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'shortest_route', title: 'Plan B: Ruta Más Corta', description: 'Minimiza la distancia total con optimización 2-opt. Recoge en la estación más cercana y entrega en ruta. Vuelos exclusivos PAX o CARGO.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'max_load', title: 'Plan C: Máxima Carga', description: 'Maximiza la ocupación en cada vuelo para reducir el número total de viajes. Prioriza estaciones con más ítems por recoger. Separa PAX de CARGO.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
+            { id: 'balanced', title: 'Plan D: Balanceado', description: 'Equilibra prioridad y eficiencia de ruta. Combina puntaje de urgencia con distancia para elegir la siguiente estación. Vuelos exclusivos por tipo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
         ];
         
         setBasePlans(initialPlans);
@@ -378,13 +378,24 @@ export default function Home() {
                 {activeView === 'plans' && (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div>
-                      <h2 className="text-xl font-bold tracking-tight mb-6 flex items-center gap-2 text-foreground">
+                      <h2 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2 text-foreground">
                         <Wind className="text-primary h-5 w-5" /> 
                         Estrategias de Vuelo Calculadas
                         <span className="ml-2 text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full border">
                           Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}
                         </span>
                       </h2>
+                      <div className="flex items-center gap-4 text-xs bg-muted/50 border rounded-lg p-3 mb-6">
+                        <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-muted-foreground">
+                          <strong className="text-foreground">Reglas activas:</strong> Pasajeros y Carga viajan en vuelos 100% separados.
+                          Turnos Mañana/Tarde no se mezclan. Prioridad 1 = más urgente.
+                        </span>
+                        <div className="flex items-center gap-3 ml-auto shrink-0">
+                          <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-blue-500" /> PAX: {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'PAX').length}</span>
+                          <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-amber-500" /> Carga: {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'CARGO').length}</span>
+                        </div>
+                      </div>
                       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                         {plansForActiveShift.map((plan) => (
                           <FlightPlanCard 
