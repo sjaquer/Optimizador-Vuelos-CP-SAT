@@ -8,9 +8,6 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { FlightPlan, TransportItem, FlightStep } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileDown } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import ExcelJS from 'exceljs';
 import { stationNamesMap } from '@/lib/stations';
 
 interface FlightItineraryProps {
@@ -56,7 +53,9 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
   const strategy = plan.id.split('_').slice(0, -1).join('_');
   const shift = plan.id.endsWith('_M') ? 'M' : 'T';
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text(`${plan.title} (Turno ${shift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
@@ -81,6 +80,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
   };
 
   const exportToExcel = async () => {
+    const ExcelJS = await import('exceljs');
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Itinerario');
 

@@ -46,4 +46,5 @@ export interface ScenarioData {
     transportItems: TransportItem[];
     weatherConditions?: string;
     operationalNotes?: string;
+    calculatedPlans?: Record<string, FlightPlan>;
 }

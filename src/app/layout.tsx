@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/app/theme-provider';
+import { ErrorBoundary } from '@/components/app/error-boundary';
 
 export const metadata: Metadata = {
   title: 'Logística Aérea — Optimización de Rutas de Helicóptero',
@@ -28,7 +29,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
         >
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
           <Toaster />
         </ThemeProvider>
       </body>

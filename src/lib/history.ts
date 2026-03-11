@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { ScenarioData } from './types';
+import type { FlightPlan, ScenarioData } from './types';
 
 const HISTORY_KEY = 'ovh_flight_history_v2';
 const MAX_HISTORY_ITEMS = 20;
@@ -19,16 +19,17 @@ export const getHistory = (): ScenarioData[] => {
   }
 };
 
-export const saveScenarioToHistory = (scenario: ScenarioData): void => {
+export const saveScenarioToHistory = (scenario: ScenarioData, plans?: Record<string, FlightPlan>): void => {
    if (typeof window === 'undefined') {
     return;
   }
   let history = getHistory();
   
   // Add a unique ID if it doesn't have one
-  const newScenarioWithId = {
+  const newScenarioWithId: ScenarioData = {
       ...scenario,
-      id: new Date().toISOString()
+      id: new Date().toISOString(),
+      calculatedPlans: plans,
   };
 
   const newHistory = [newScenarioWithId, ...history].slice(0, MAX_HISTORY_ITEMS);

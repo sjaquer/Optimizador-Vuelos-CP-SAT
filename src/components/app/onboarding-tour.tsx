@@ -305,8 +305,8 @@ export function OnboardingPrompt({
               ¿Te gustaría un recorrido rápido para conocer todas las funciones?
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-            <Button onClick={onAccept} className="w-full sm:w-auto px-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Button onClick={onAccept} className="w-full sm:w-auto px-8 shadow-sm">
               <BookOpen className="h-4 w-4 mr-2" />
               Sí, mostrar recorrido
             </Button>
