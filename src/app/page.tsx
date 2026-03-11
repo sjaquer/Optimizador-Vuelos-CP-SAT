@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import * as ExcelJS from 'exceljs';
 import {
   SidebarProvider,
@@ -258,16 +258,17 @@ export default function Home() {
       r.getCell(1).fill = NOTE_FILL;
     });
 
-    // Data validations
-    wsItems.dataValidations.add('B2:B200', {
+    // Data validations (cast needed — ExcelJS types lag behind runtime API)
+    const wsItemsAny = wsItems as any;
+    wsItemsAny.dataValidations.add('B2:B200', {
       type: 'list', allowBlank: false, formulae: ['"PAX,CARGO"'],
       showErrorMessage: true, errorTitle: 'Tipo inválido', error: 'Solo PAX o CARGO.',
     });
-    wsItems.dataValidations.add('C2:C200', {
+    wsItemsAny.dataValidations.add('C2:C200', {
       type: 'list', allowBlank: false, formulae: ['"M,T"'],
       showErrorMessage: true, errorTitle: 'Turno inválido', error: 'Solo M (Mañana) o T (Tarde).',
     });
-    wsItems.dataValidations.add('D2:D200', {
+    wsItemsAny.dataValidations.add('D2:D200', {
       type: 'whole', allowBlank: false, operator: 'between',
       formulae: [1, 5], showErrorMessage: true, errorTitle: 'Prioridad', error: 'Valor entre 1 y 5.',
     });

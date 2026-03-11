@@ -4,7 +4,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { FlightPlan } from '@/lib/types';
-import { User, Wind, Milestone, Package, AlertTriangle, Scale, Route, Gauge, PlaneTakeoff, ShieldCheck } from 'lucide-react';
+import { User, Milestone, Package, AlertTriangle, Route, Gauge, PlaneTakeoff, ShieldCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
