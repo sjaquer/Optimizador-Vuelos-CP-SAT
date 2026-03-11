@@ -14,7 +14,8 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Bot, Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package } from 'lucide-react';
+import { Bot, Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle } from 'lucide-react';
+import { OnboardingTour, OnboardingPrompt, useOnboarding } from '@/components/app/onboarding-tour';
 import { ALL_STATIONS } from '@/lib/stations';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +57,7 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const onboarding = useOnboarding();
   
   const selectedPlan = useMemo(() => {
     if (!selectedPlanId) return null;
@@ -135,8 +137,8 @@ export default function Home() {
     wb.creator = 'Optimizador de Vuelos';
     wb.created = new Date();
 
-    const BRAND = '1F3A6E'; // dark blue
-    const BRAND_LIGHT = 'E8EDF5';
+    const BRAND = 'E65100'; // Repsol orange
+    const BRAND_LIGHT = 'FFF3E0';
     const HEADER_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BRAND } };
     const HEADER_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
     const NOTE_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9E6' } };
@@ -467,6 +469,7 @@ export default function Home() {
   }
 
   return (
+    <>
     <SidebarProvider>
       <Sidebar>
         <InputSidebar
@@ -500,6 +503,9 @@ export default function Home() {
               </Button>
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls" className="hidden" />
               <div className="h-6 w-px bg-border mx-1"></div>
+              <Button variant="ghost" size="icon" onClick={onboarding.restart} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Recorrido de ayuda">
+                <HelpCircle className="h-5 w-5" />
+              </Button>
               <ThemeToggle />
             </div>
           </header>
@@ -612,6 +618,15 @@ export default function Home() {
         </div>
       </SidebarInset>
     </SidebarProvider>
+
+    {/* Onboarding flow */}
+    {onboarding.phase === 'prompt' && (
+      <OnboardingPrompt onAccept={onboarding.accept} onDecline={onboarding.decline} />
+    )}
+    {onboarding.phase === 'tour' && (
+      <OnboardingTour onComplete={onboarding.complete} />
+    )}
+    </>
   );
 }
 

@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/app/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'OVH por sjaquer - Optimización de Rutas de Helicóptero',
-  description: 'Optimiza los planes de vuelo de helicópteros para el transporte de pasajeros entre múltiples estaciones.',
+  title: 'Logística Aérea — Optimización de Rutas de Helicóptero',
+  description: 'Sistema de planificación y optimización de vuelos de helicóptero para transporte de pasajeros y carga entre estaciones operativas.',
 };
 
 export default function RootLayout({
