@@ -17,11 +17,12 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import type { ScenarioData } from '@/lib/types';
-import { Plus, Trash2, Wind, ArrowRight, History, Users, Package, Shuffle } from 'lucide-react';
+import { Plus, Trash2, Wind, ArrowRight, History, Users, Package, Shuffle, FileText, Shield, Plane, User, ClipboardList } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getHistory, deleteScenarioFromHistory, generateRandomScenario, saveScenarioToHistory } from '@/lib/history';
 import {
@@ -57,6 +58,15 @@ const formSchema = z.object({
   transportItems: z.array(transportItemSchema),
   weatherConditions: z.string().optional(),
   operationalNotes: z.string().optional(),
+  missionDetails: z.object({
+    pilotInCommand: z.string().optional(),
+    copilot: z.string().optional(),
+    aircraftCallsign: z.string().optional(),
+    missionObjective: z.string().optional(),
+    authorization: z.string().optional(),
+    clientOrProject: z.string().optional(),
+    missionNotes: z.string().optional(),
+  }).optional(),
 }).refine(data => {
     return data.transportItems.every(p => p.originStation <= data.numStations && p.destinationStation <= data.numStations);
 }, { message: "Estación debe ser <= al nro de estaciones", path: ["transportItems"] })
@@ -112,6 +122,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
         const paxWeight = values.paxDefaultWeight || 80;
         const processedValues = {
             ...values,
+            missionDetails: values.missionDetails,
             transportItems: values.transportItems.map(item => ({
                 ...item,
                 weight: item.type === 'PAX' ? paxWeight : item.weight!,
@@ -172,19 +183,95 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                {activeView === 'editor' ? (
                 <>
                   <div className="bg-card border rounded-lg p-3 shadow-sm">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5"><Wind className="h-3.5 w-3.5"/> Condiciones</h3>
-                    <div className="space-y-3">
-                      <FormField control={form.control} name="weatherConditions" render={({ field }) => (
-                          <FormItem>
-                            <FormControl><Input placeholder="Clima (Ej: Viento 15km/h NNO)" className="text-xs h-8 bg-background border-border" {...field} /></FormControl>
-                          </FormItem>
-                        )}/>
-                      <FormField control={form.control} name="operationalNotes" render={({ field }) => (
-                          <FormItem>
-                            <FormControl><Input placeholder="Notas operacionales o alertas..." className="text-xs h-8 bg-background border-border" {...field} /></FormControl>
-                          </FormItem>
-                        )}/>
-                    </div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5"><FileText className="h-3.5 w-3.5"/> Briefing de Misión</h3>
+                    <Accordion type="multiple" defaultValue={['weather', 'crew']} className="w-full">
+                      <AccordionItem value="weather" className="border-b-0">
+                        <AccordionTrigger className="py-2 text-xs font-semibold text-muted-foreground hover:no-underline">
+                          <span className="flex items-center gap-1.5"><Wind className="h-3 w-3 text-blue-500"/> Condiciones Meteorológicas</span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-1 pb-3">
+                          <div className="space-y-2">
+                            <FormField control={form.control} name="weatherConditions" render={({ field }) => (
+                              <FormItem>
+                                <FormControl><Input placeholder="Ej: CAVOK, viento 10kt NNO, techo 3000ft" className="text-xs h-8 bg-background border-border" {...field} /></FormControl>
+                              </FormItem>
+                            )}/>
+                            <FormField control={form.control} name="operationalNotes" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Restricciones / Alertas</FormLabel>
+                                <FormControl><Textarea placeholder="Ventana operativa, restricciones de helipuerto, NOTAMs activos..." className="text-xs min-h-[56px] bg-background border-border resize-none" {...field} /></FormControl>
+                              </FormItem>
+                            )}/>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="crew" className="border-b-0">
+                        <AccordionTrigger className="py-2 text-xs font-semibold text-muted-foreground hover:no-underline">
+                          <span className="flex items-center gap-1.5"><User className="h-3 w-3 text-emerald-500"/> Tripulación y Aeronave</span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-1 pb-3">
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <FormField control={form.control} name="missionDetails.pilotInCommand" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Piloto al Mando</FormLabel>
+                                  <FormControl><Input placeholder="Nombre PIC" className="text-xs h-8 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                </FormItem>
+                              )}/>
+                              <FormField control={form.control} name="missionDetails.copilot" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Copiloto / SIC</FormLabel>
+                                  <FormControl><Input placeholder="Nombre SIC" className="text-xs h-8 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                </FormItem>
+                              )}/>
+                            </div>
+                            <FormField control={form.control} name="missionDetails.aircraftCallsign" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Matrícula / Callsign</FormLabel>
+                                <FormControl><Input placeholder="Ej: OB-2145-P" className="text-xs h-8 bg-background border-border font-mono uppercase" {...field} value={field.value || ''} /></FormControl>
+                              </FormItem>
+                            )}/>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="mission" className="border-b-0">
+                        <AccordionTrigger className="py-2 text-xs font-semibold text-muted-foreground hover:no-underline">
+                          <span className="flex items-center gap-1.5"><ClipboardList className="h-3 w-3 text-amber-500"/> Detalle de Misión</span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-1 pb-3">
+                          <div className="space-y-2">
+                            <FormField control={form.control} name="missionDetails.missionObjective" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Objetivo de Misión</FormLabel>
+                                <FormControl><Input placeholder="Ej: Rotación de personal turno 14D" className="text-xs h-8 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                              </FormItem>
+                            )}/>
+                            <div className="grid grid-cols-2 gap-2">
+                              <FormField control={form.control} name="missionDetails.clientOrProject" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Cliente / Proyecto</FormLabel>
+                                  <FormControl><Input placeholder="Nombre del proyecto" className="text-xs h-8 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                </FormItem>
+                              )}/>
+                              <FormField control={form.control} name="missionDetails.authorization" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">N° Autorización</FormLabel>
+                                  <FormControl><Input placeholder="AUTH-XXXX" className="text-xs h-8 bg-background border-border font-mono" {...field} value={field.value || ''} /></FormControl>
+                                </FormItem>
+                              )}/>
+                            </div>
+                            <FormField control={form.control} name="missionDetails.missionNotes" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Notas Adicionales de Misión</FormLabel>
+                                <FormControl><Textarea placeholder="Información adicional, coordinaciones especiales, frecuencias radio, contactos en tierra..." className="text-xs min-h-[64px] bg-background border-border resize-none" {...field} value={field.value || ''} /></FormControl>
+                              </FormItem>
+                            )}/>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </div>
 
                   <div className="bg-card border rounded-lg p-3 shadow-sm">
@@ -279,7 +366,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
               ) : (
                  <div>
                      <div className="flex items-center justify-between mb-3">
-                       <h3 className="text-sm font-medium">Historial</h3>
+                       <h3 className="text-sm font-medium">Historial de Misiones</h3>
                        <Button
                          type="button"
                          variant="outline"
@@ -298,26 +385,91 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                      </div>
                       {history.length > 0 ? (
                         <Accordion type="single" collapsible className="w-full">
-                            {history.map((histScenario, index) => (
+                            {history.map((histScenario, index) => {
+                              const paxCount = histScenario.transportItems.filter(i=>i.type==='PAX').length;
+                              const cargoCount = histScenario.transportItems.filter(i=>i.type==='CARGO').length;
+                              const md = histScenario.missionDetails;
+                              const dateStr = histScenario.id ? new Date(histScenario.id).toLocaleString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Sin fecha';
+
+                              return (
                               <AccordionItem value={`item-${index}`} key={histScenario.id}>
-                                <AccordionTrigger>
-                                    <span className="truncate flex-1 text-left">
-                                      Escenario del {new Date(histScenario.id!).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                    </span>
+                                <AccordionTrigger className="hover:no-underline">
+                                    <div className="flex flex-col items-start gap-0.5 flex-1 text-left">
+                                      <span className="text-xs font-semibold truncate max-w-[220px]">
+                                        {md?.missionObjective || `Misión ${dateStr}`}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {dateStr} · {histScenario.transportItems.length} items
+                                      </span>
+                                    </div>
                                 </AccordionTrigger>
-                                <AccordionContent className='space-y-4'>
-                                  <div className='text-xs text-muted-foreground space-y-2'>
-                                     <p><strong>Items:</strong> {histScenario.transportItems.length} ({histScenario.transportItems.filter(i=>i.type==='PAX').length} PAX, {histScenario.transportItems.filter(i=>i.type==='CARGO').length} Carga)</p>
-                                     <p><strong>Estaciones:</strong> {histScenario.numStations}</p>
-                                     <p><strong>Capacidad:</strong> {histScenario.helicopterCapacity} asientos, {histScenario.helicopterMaxWeight} kg</p>
+                                <AccordionContent className='space-y-3 pt-1'>
+                                  {/* Mission info */}
+                                  {md && (md.pilotInCommand || md.aircraftCallsign || md.clientOrProject) && (
+                                    <div className="bg-muted/50 rounded-md p-2 space-y-1 border">
+                                      {md.aircraftCallsign && (
+                                        <div className="flex items-center gap-1.5 text-[11px]">
+                                          <Plane className="h-3 w-3 text-primary shrink-0" />
+                                          <span className="font-mono font-bold">{md.aircraftCallsign}</span>
+                                        </div>
+                                      )}
+                                      {md.pilotInCommand && (
+                                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                          <User className="h-3 w-3 shrink-0" />
+                                          <span>PIC: <strong className="text-foreground">{md.pilotInCommand}</strong></span>
+                                          {md.copilot && <span className="ml-1">/ SIC: <strong className="text-foreground">{md.copilot}</strong></span>}
+                                        </div>
+                                      )}
+                                      {md.clientOrProject && (
+                                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                          <ClipboardList className="h-3 w-3 shrink-0" />
+                                          <span>{md.clientOrProject}</span>
+                                          {md.authorization && <span className="ml-1 font-mono text-[10px]">({md.authorization})</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Weather & notes */}
+                                  {(histScenario.weatherConditions || histScenario.operationalNotes) && (
+                                    <div className="bg-blue-500/5 rounded-md p-2 space-y-1 border border-blue-500/10">
+                                      {histScenario.weatherConditions && (
+                                        <div className="flex items-start gap-1.5 text-[11px]">
+                                          <Wind className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" />
+                                          <span>{histScenario.weatherConditions}</span>
+                                        </div>
+                                      )}
+                                      {histScenario.operationalNotes && (
+                                        <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                                          <Shield className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" />
+                                          <span>{histScenario.operationalNotes}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Operational summary */}
+                                  <div className='text-xs text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 bg-background rounded-md p-2 border'>
+                                     <div className="flex justify-between"><span>PAX</span><strong className="text-blue-600 dark:text-blue-400">{paxCount}</strong></div>
+                                     <div className="flex justify-between"><span>Carga</span><strong className="text-amber-600 dark:text-amber-400">{cargoCount}</strong></div>
+                                     <div className="flex justify-between"><span>Estaciones</span><strong className="text-foreground">{histScenario.numStations}</strong></div>
+                                     <div className="flex justify-between"><span>Capacidad</span><strong className="text-foreground">{histScenario.helicopterCapacity} / {histScenario.helicopterMaxWeight}kg</strong></div>
                                   </div>
+
+                                  {/* Mission notes */}
+                                  {md?.missionNotes && (
+                                    <div className="text-[11px] text-muted-foreground bg-muted/30 p-2 rounded-md border italic">
+                                      {md.missionNotes}
+                                    </div>
+                                  )}
+
                                   <div className='flex gap-2'>
-                                    <Button size="sm" onClick={() => loadScenarioFromHistory(histScenario)} className="flex-1">Cargar</Button>
-                                    <Button size="sm" variant="destructive" onClick={() => deleteScenario(histScenario.id)}><Trash2/></Button>
+                                    <Button size="sm" onClick={() => loadScenarioFromHistory(histScenario)} className="flex-1">Cargar Escenario</Button>
+                                    <Button size="sm" variant="destructive" onClick={() => deleteScenario(histScenario.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                                   </div>
                                 </AccordionContent>
                               </AccordionItem>
-                            ))}
+                            )})}
                           </Accordion>
                       ) : (<p className="text-sm text-muted-foreground text-center py-4">No hay escenarios guardados.</p>)}
                  </div>

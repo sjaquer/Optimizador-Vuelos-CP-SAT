@@ -37,6 +37,16 @@ export interface FlightPlan {
   };
 }
 
+export interface MissionDetails {
+  pilotInCommand?: string;
+  copilot?: string;
+  aircraftCallsign?: string;
+  missionObjective?: string;
+  authorization?: string;
+  clientOrProject?: string;
+  missionNotes?: string;
+}
+
 export interface ScenarioData {
     id?: string; // Unique identifier for history
     numStations: number;
@@ -46,5 +56,6 @@ export interface ScenarioData {
     transportItems: TransportItem[];
     weatherConditions?: string;
     operationalNotes?: string;
+    missionDetails?: MissionDetails;
     calculatedPlans?: Record<string, FlightPlan>;
 }

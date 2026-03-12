@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { FlightPlan, TransportItem, FlightStep } from '@/lib/types';
-import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileDown } from 'lucide-react';
+import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileDown, RotateCw } from 'lucide-react';
 import { stationNamesMap } from '@/lib/stations';
 
 interface FlightItineraryProps {
@@ -15,9 +15,15 @@ interface FlightItineraryProps {
 }
 
 const actionTranslations: Record<FlightStep['action'], string> = {
-  PICKUP: 'RECOGER',
-  DROPOFF: 'DEJAR',
-  TRAVEL: 'VIAJAR',
+  PICKUP: 'EMBARQUE',
+  DROPOFF: 'DESEMBARQUE',
+  TRAVEL: 'EN VUELO',
+};
+
+/** Extract flight number from notes like "[Vuelo #2] ..." */
+const getFlightNum = (notes: string): number | null => {
+  const m = notes.match(/\[Vuelo #(\d+)\]/);
+  return m ? Number(m[1]) : null;
 };
 
 export function FlightItinerary({ plan }: FlightItineraryProps) {
@@ -155,33 +161,64 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]">Paso</TableHead>
-              <TableHead className="w-[120px]">Acción</TableHead>
+              <TableHead className="w-[50px]">Vuelo</TableHead>
+              <TableHead className="w-[130px]">Acción</TableHead>
               <TableHead>Estación</TableHead>
               <TableHead>Items</TableHead>
-              <TableHead>Notas</TableHead>
+              <TableHead>Detalle</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {plan.steps.map((step, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{index + 1}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2 font-medium">
-                    {getActionIcon(step.action)}
-                    <span>{getActionLabel(step.action)}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{sName(step.station)}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1">
-                    {step.items.map((item) => (
-                      <div key={item.id}>{getItemLabel(item)}</div>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-xs">{step.notes}</TableCell>
-              </TableRow>
-            ))}
+            {plan.steps.map((step, index) => {
+              const flightNum = getFlightNum(step.notes);
+              const prevFlightNum = index > 0 ? getFlightNum(plan.steps[index - 1].notes) : null;
+              const isNewFlight = flightNum !== null && flightNum !== prevFlightNum;
+              const noteText = step.notes.replace(/\[Vuelo #\d+\]\s*/, '');
+
+              return (
+                <>
+                  {isNewFlight && (
+                    <TableRow key={`sep-${index}`} className="bg-muted/40 border-t-2 border-primary/20">
+                      <TableCell colSpan={6} className="py-1.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-primary">
+                          <RotateCw className="h-3.5 w-3.5" />
+                          Vuelo #{flightNum}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  <TableRow key={index} className={step.action === 'TRAVEL' ? 'bg-muted/10' : ''}>
+                    <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                    <TableCell>
+                      {flightNum !== null && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                          #{flightNum}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 font-medium">
+                        {getActionIcon(step.action)}
+                        <span className={
+                          step.action === 'PICKUP' ? 'text-emerald-700 dark:text-emerald-400' :
+                          step.action === 'DROPOFF' ? 'text-blue-700 dark:text-blue-400' :
+                          'text-muted-foreground'
+                        }>{getActionLabel(step.action)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">{sName(step.station)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {step.items.map((item) => (
+                          <div key={item.id}>{getItemLabel(item)}</div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs max-w-[250px]">{noteText}</TableCell>
+                  </TableRow>
+                </>
+              );
+            })}
           </TableBody>
         </Table>
       </CardContent>

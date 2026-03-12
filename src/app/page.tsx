@@ -14,7 +14,7 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle } from 'lucide-react';
+import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle, User, ClipboardList } from 'lucide-react';
 import { OnboardingTour, OnboardingPrompt, useOnboarding } from '@/components/app/onboarding-tour';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
@@ -45,6 +45,15 @@ export default function Home() {
     transportItems: [],
     weatherConditions: '',
     operationalNotes: '',
+    missionDetails: {
+      pilotInCommand: '',
+      copilot: '',
+      aircraftCallsign: '',
+      missionObjective: '',
+      authorization: '',
+      clientOrProject: '',
+      missionNotes: '',
+    },
   });
 
   const [basePlans, setBasePlans] = useState<FlightPlan[]>([]);
@@ -244,6 +253,7 @@ export default function Home() {
             transportItems, 
             weatherConditions: '',
             operationalNotes: '',
+            missionDetails: {},
         });
         toast({ title: 'Éxito', description: 'Datos del escenario importados correctamente.' });
       } catch (error) {
@@ -413,6 +423,60 @@ export default function Home() {
                           Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}
                         </span>
                       </h2>
+
+                      {/* Mission briefing bar */}
+                      {scenario.missionDetails && (scenario.missionDetails.pilotInCommand || scenario.missionDetails.aircraftCallsign || scenario.missionDetails.missionObjective) && (
+                        <div className="bg-card border rounded-lg p-3 mb-4 shadow-sm">
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+                            {scenario.missionDetails.aircraftCallsign && (
+                              <div className="flex items-center gap-1.5">
+                                <Plane className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-muted-foreground">Aeronave:</span>
+                                <span className="font-mono font-bold">{scenario.missionDetails.aircraftCallsign}</span>
+                              </div>
+                            )}
+                            {scenario.missionDetails.pilotInCommand && (
+                              <div className="flex items-center gap-1.5">
+                                <User className="h-3.5 w-3.5 text-emerald-500" />
+                                <span className="text-muted-foreground">PIC:</span>
+                                <span className="font-semibold">{scenario.missionDetails.pilotInCommand}</span>
+                                {scenario.missionDetails.copilot && (
+                                  <span className="text-muted-foreground">/ SIC: <span className="font-semibold text-foreground">{scenario.missionDetails.copilot}</span></span>
+                                )}
+                              </div>
+                            )}
+                            {scenario.missionDetails.missionObjective && (
+                              <div className="flex items-center gap-1.5">
+                                <ClipboardList className="h-3.5 w-3.5 text-amber-500" />
+                                <span className="text-muted-foreground">Misión:</span>
+                                <span className="font-semibold">{scenario.missionDetails.missionObjective}</span>
+                              </div>
+                            )}
+                            {scenario.missionDetails.authorization && (
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                <span className="font-mono text-[10px] bg-muted px-2 py-0.5 rounded border">{scenario.missionDetails.authorization}</span>
+                              </div>
+                            )}
+                          </div>
+                          {(scenario.weatherConditions || scenario.operationalNotes) && (
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] mt-2 pt-2 border-t border-dashed">
+                              {scenario.weatherConditions && (
+                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                  <Wind className="h-3 w-3 text-blue-500" />
+                                  {scenario.weatherConditions}
+                                </div>
+                              )}
+                              {scenario.operationalNotes && (
+                                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  {scenario.operationalNotes}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-4 text-xs bg-muted/50 border rounded-lg p-3 mb-6">
                         <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
                         <span className="text-muted-foreground">

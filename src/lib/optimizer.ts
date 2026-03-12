@@ -135,9 +135,26 @@ function buildTypeRoute(
   const steps: FlightStep[] = [];
   let currentStation = 0;
   let totalDist = 0;
+  let flightNum = 0;
+  let needsNewFlight = true;
 
   const weight = () => helicopter.reduce((s, i) => s + i.weight, 0);
   const seats = () => helicopter.length;
+  const typeLabel = allItems[0].type === 'PAX' ? 'Pasajeros' : 'Carga';
+  const typeShort = allItems[0].type;
+
+  const boardSummary = (items: TransportItem[]) => {
+    const w = items.reduce((s, i) => s + i.weight, 0);
+    if (typeShort === 'PAX') return `${items.length} pasajero(s), ${w} kg`;
+    return `${items.length} bulto(s), ${w} kg`;
+  };
+
+  const onboardSummary = () => {
+    if (helicopter.length === 0) return 'vacío';
+    const w = weight();
+    if (typeShort === 'PAX') return `${helicopter.length} PAX a bordo (${w} kg)`;
+    return `${helicopter.length} carga(s) a bordo (${w} kg)`;
+  };
 
   const MAX_ITERATIONS = 300;
   let iter = 0;
@@ -145,15 +162,22 @@ function buildTypeRoute(
   while ((pending.length > 0 || helicopter.length > 0) && iter < MAX_ITERATIONS) {
     iter++;
 
+    // ── Mark start of new flight from base ──
+    if (currentStation === 0 && needsNewFlight && (pending.length > 0 || helicopter.length > 0)) {
+      flightNum++;
+      needsNewFlight = false;
+    }
+
     // ── DROPOFF at current station ──
     const toDrop = helicopter.filter(p => p.destinationStation === currentStation);
     if (toDrop.length > 0) {
       helicopter = helicopter.filter(p => !toDrop.some(dp => dp.id === p.id));
+      const dropW = toDrop.reduce((s, i) => s + i.weight, 0);
       steps.push({
         action: 'DROPOFF',
         station: currentStation,
         items: toDrop,
-        notes: `Desembarque de ${toDrop.length} ítem(s) en ${stationLabel(currentStation)}.`,
+        notes: `[Vuelo #${flightNum}] Desembarque en ${stationLabel(currentStation)}: ${boardSummary(toDrop)}. ${helicopter.length > 0 ? `Quedan ${onboardSummary()}.` : 'Helicóptero vacío.'}`,
       });
     }
 
@@ -173,11 +197,12 @@ function buildTypeRoute(
     }
 
     if (pickedUp.length > 0) {
+      const isBase = currentStation === 0;
       steps.push({
         action: 'PICKUP',
         station: currentStation,
         items: pickedUp,
-        notes: `Embarque de ${pickedUp.length} ítem(s) en ${stationLabel(currentStation)}.`,
+        notes: `[Vuelo #${flightNum}] ${isBase ? '🚁 Embarque en Base' : 'Embarque en'} ${stationLabel(currentStation)}: ${boardSummary(pickedUp)}. Total a bordo: ${onboardSummary()} (${Math.round(weight() / scenario.helicopterMaxWeight * 100)}% carga).`,
       });
     }
 
@@ -193,7 +218,7 @@ function buildTypeRoute(
         action: 'TRAVEL',
         station: nextStation,
         items: deepCopy(helicopter),
-        notes: `Volando ${stationLabel(currentStation)} → ${stationLabel(nextStation)} (${legDist} ud)`,
+        notes: `[Vuelo #${flightNum}] ${stationLabel(currentStation)} → ${stationLabel(nextStation)} (${legDist} ud) · ${onboardSummary()}`,
       });
       currentStation = nextStation;
     } else if (helicopter.length > 0 && currentStation !== 0) {
@@ -202,18 +227,19 @@ function buildTypeRoute(
       totalDist += legDist;
       steps.push({
         action: 'TRAVEL', station: 0, items: deepCopy(helicopter),
-        notes: `Regresando a base desde ${stationLabel(currentStation)} (${legDist} ud)`,
+        notes: `[Vuelo #${flightNum}] Regresando a Base desde ${stationLabel(currentStation)} (${legDist} ud) · ${onboardSummary()}`,
       });
       currentStation = 0;
     } else if (helicopter.length === 0 && pending.length > 0 && currentStation !== 0) {
-      // Go back to base to start a new flight
+      // Return to base empty for a new flight
       const legDist = getDistance(currentStation, 0);
       totalDist += legDist;
       steps.push({
         action: 'TRAVEL', station: 0, items: [],
-        notes: `Regreso a base desde ${stationLabel(currentStation)} para nuevo vuelo (${legDist} ud)`,
+        notes: `[Vuelo #${flightNum}] Regreso a Base desde ${stationLabel(currentStation)} para nuevo vuelo (${legDist} ud) · vacío`,
       });
       currentStation = 0;
+      needsNewFlight = true;
     } else {
       break;
     }
@@ -223,7 +249,7 @@ function buildTypeRoute(
   if (currentStation !== 0 && steps.length > 0) {
     const legDist = getDistance(currentStation, 0);
     totalDist += legDist;
-    steps.push({ action: 'TRAVEL', station: 0, items: [], notes: `Regreso final a ${stationLabel(0)}.` });
+    steps.push({ action: 'TRAVEL', station: 0, items: [], notes: `[Vuelo #${flightNum}] Regreso final a ${stationLabel(0)}.` });
   }
 
   return { steps, totalDist, notDelivered: [...pending] };
@@ -289,7 +315,7 @@ function buildRoute(
         totalDist += legDist;
         allSteps.push({
           action: 'TRAVEL', station: 0, items: [],
-          notes: `Regreso a base para iniciar vuelos de ${type === 'PAX' ? 'Pasajeros' : 'Carga'}.`,
+          notes: `Regreso a Base para iniciar vuelos de ${type === 'PAX' ? 'Pasajeros' : 'Carga'} · vacío`,
         });
       }
     }

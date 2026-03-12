@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { FlightPlan, ScenarioData, TransportItem } from './types';
+import type { FlightPlan, ScenarioData, TransportItem, MissionDetails } from './types';
 import { ALL_STATIONS } from './stations';
 
 const HISTORY_KEY = 'ovh_flight_history_v2';
@@ -97,6 +97,51 @@ const OPERATIONAL_NOTES_OPTIONS = [
   '',
 ];
 
+const PILOT_NAMES = [
+  'Cap. Rodríguez M.', 'Cap. Fernández J.', 'Cap. Torres A.', 'Cap. Gutiérrez L.',
+  'Cap. Sánchez D.', 'Cap. Paredes R.', 'Cap. Villanueva C.', 'Cap. Mendoza H.',
+];
+
+const COPILOT_NAMES = [
+  'SIC Quispe P.', 'SIC Huamán E.', 'SIC Castillo V.', 'SIC Chávez N.',
+  'SIC Rivera G.', 'SIC Condori F.', '', '',
+];
+
+const CALLSIGNS = [
+  'OB-2145-P', 'OB-1987-P', 'OB-2201-P', 'OB-1860-P',
+  'OB-2310-P', 'OB-9934-P', 'HK-5021', 'OB-2089-P',
+];
+
+const MISSION_OBJECTIVES = [
+  'Rotación de personal turno 14D',
+  'Abastecimiento de estaciones remotas',
+  'Evacuación programada fin de ciclo',
+  'Movilización de equipo de perforación',
+  'Traslado de muestras y personal geología',
+  'Cambio de guardia + provisiones',
+  'Soporte logístico operación sísmica',
+  'Relevo de cuadrilla HSE',
+];
+
+const CLIENT_PROJECTS = [
+  'Consorcio Camisea', 'Proyecto Kinteroni', 'Lote 88 Operaciones',
+  'Pluspetrol Norte', 'CNPC Perú', 'Hunt Oil Exploración',
+  'Repsol Upstream', 'Tecpetrol Sur',
+];
+
+const AUTHORIZATION_PREFIXES = ['AUTH', 'OPS', 'FLT', 'LOG'];
+
+const MISSION_NOTES_OPTIONS = [
+  'Coordinar con torre Malvinas frecuencia 123.45 MHz. Contacto en tierra: Ing. Vargas cel. 987654321.',
+  'Carga frágil en slot PM, requiere manipulación especial. Confirmar con base antes de despegue.',
+  'Pasajero con restricción médica, disponer botiquín avanzado. Coordinar ambulancia en Base.',
+  'Repostaje programado en HP Kinteroni si autonomía < 1.5 hrs. Check fuel antes de salida.',
+  'Material HAZMAT clase 3 en vuelo CARGO, portar MSDS y kit de derrame. Solo vuelo directo.',
+  'Ventana de vuelo reducida por ROL de tripulación. Máximo 8 hrs de servicio restantes.',
+  '',
+  '',
+];
+
 function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -180,6 +225,16 @@ export function generateRandomScenario(): ScenarioData {
   // Shuffle so PAX and CARGO are interleaved
   transportItems.sort(() => Math.random() - 0.5);
 
+  const missionDetails: MissionDetails = {
+    pilotInCommand: pick(PILOT_NAMES),
+    copilot: pick(COPILOT_NAMES),
+    aircraftCallsign: pick(CALLSIGNS),
+    missionObjective: pick(MISSION_OBJECTIVES),
+    clientOrProject: pick(CLIENT_PROJECTS),
+    authorization: `${pick(AUTHORIZATION_PREFIXES)}-${randInt(1000, 9999)}`,
+    missionNotes: pick(MISSION_NOTES_OPTIONS),
+  };
+
   return {
     numStations,
     helicopterCapacity,
@@ -188,5 +243,6 @@ export function generateRandomScenario(): ScenarioData {
     transportItems,
     weatherConditions: pick(WEATHER_OPTIONS),
     operationalNotes: pick(OPERATIONAL_NOTES_OPTIONS),
+    missionDetails,
   };
 }
