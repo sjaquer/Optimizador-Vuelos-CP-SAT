@@ -1,7 +1,8 @@
 
 'use client';
 
-import type { FlightPlan, ScenarioData } from './types';
+import type { FlightPlan, ScenarioData, TransportItem } from './types';
+import { ALL_STATIONS } from './stations';
 
 const HISTORY_KEY = 'ovh_flight_history_v2';
 const MAX_HISTORY_ITEMS = 20;
@@ -53,4 +54,139 @@ export const deleteScenarioFromHistory = (scenarioId: string): void => {
   } catch (error) {
      console.error("Failed to update history in localStorage", error);
   }
+}
+
+// ──── Random Scenario Generator ──────────────────────────────────────
+
+const AREAS = [
+  'Operaciones', 'Perforación', 'Logística', 'Mantenimiento',
+  'Geología', 'HSE', 'Supervisión', 'Ingeniería', 'Campamento',
+  'Producción', 'Medio Ambiente', 'Topografía',
+];
+
+const CARGO_DESCRIPTIONS = [
+  'Herramientas de perforación', 'Repuestos de bomba', 'Tubería 4"',
+  'Material eléctrico', 'Provisiones campamento', 'Equipo de soldadura',
+  'Muestras geológicas', 'EPP para cuadrilla', 'Cemento especial',
+  'Válvulas de seguridad', 'Kit de primeros auxilios', 'Filtros industriales',
+  'Cable de acero 200m', 'Baterías y generador', 'Instrumental topográfico',
+  'Químicos de tratamiento', 'Piezas de reemplazo compresor',
+];
+
+const WEATHER_OPTIONS = [
+  'Despejado, visibilidad >10km',
+  'Parcialmente nublado, viento 10km/h SE',
+  'Viento fuerte 25km/h NNO, techo 2500ft',
+  'Niebla matutina, despeja ~09:00',
+  'Tormenta eléctrica prevista PM',
+  'Lluvia ligera, visibilidad 5km',
+  'CAVOK, condiciones ideales',
+  'Bruma, techo 1500ft, mejorando',
+];
+
+const OPERATIONAL_NOTES_OPTIONS = [
+  'Priorizar evacuación de personal turno saliente',
+  'Estación 4 con restricción de peso por terreno blando',
+  'Ventana operativa reducida: 06:00-14:00',
+  'Combustible limitado – máx 4 rotaciones',
+  'Carga frágil requiere vuelo directo sin escalas intermedias',
+  'Personal VIP en traslado, coordinar con seguridad',
+  'Rotación de cambio de guardia 14 días',
+  'Emergencia médica posible, reservar slot PM',
+  '',
+  '',
+];
+
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickUnique<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(n, arr.length));
+}
+
+export function generateRandomScenario(): ScenarioData {
+  const numStations = randInt(4, ALL_STATIONS.length - 1);
+  const helicopterCapacity = pick([6, 8, 10, 12]);
+  const helicopterMaxWeight = pick([800, 1000, 1200, 1500]);
+  const paxDefaultWeight = pick([75, 80, 85]);
+
+  // Generate between 6 and 18 transport items for a robust test
+  const numItems = randInt(6, 18);
+  const transportItems: TransportItem[] = [];
+
+  // Ensure a good mix: at least 30% PAX and 30% CARGO
+  const minPax = Math.max(2, Math.floor(numItems * 0.3));
+  const minCargo = Math.max(2, Math.floor(numItems * 0.3));
+  const paxCount = randInt(minPax, numItems - minCargo);
+  const cargoCount = numItems - paxCount;
+
+  // Generate PAX items
+  for (let i = 0; i < paxCount; i++) {
+    let origin = randInt(0, numStations);
+    let destination = randInt(0, numStations);
+    while (destination === origin) {
+      destination = randInt(0, numStations);
+    }
+
+    transportItems.push({
+      id: crypto.randomUUID(),
+      area: pick(AREAS),
+      type: 'PAX',
+      shift: pick(['M', 'T']),
+      priority: randInt(1, 5),
+      quantity: 1,
+      originStation: origin,
+      destinationStation: destination,
+      weight: paxDefaultWeight,
+      description: `Pasajero de ${pick(AREAS)}`,
+    });
+  }
+
+  // Generate CARGO items
+  for (let i = 0; i < cargoCount; i++) {
+    let origin = randInt(0, numStations);
+    let destination = randInt(0, numStations);
+    while (destination === origin) {
+      destination = randInt(0, numStations);
+    }
+
+    const weight = pick([
+      randInt(20, 80),    // light cargo
+      randInt(80, 200),   // medium cargo
+      randInt(200, 500),  // heavy cargo
+      randInt(500, 900),  // very heavy (may push limits)
+    ]);
+
+    transportItems.push({
+      id: crypto.randomUUID(),
+      area: pick(AREAS),
+      type: 'CARGO',
+      shift: pick(['M', 'T']),
+      priority: randInt(1, 5),
+      quantity: 1,
+      originStation: origin,
+      destinationStation: destination,
+      weight,
+      description: pick(CARGO_DESCRIPTIONS),
+    });
+  }
+
+  // Shuffle so PAX and CARGO are interleaved
+  transportItems.sort(() => Math.random() - 0.5);
+
+  return {
+    numStations,
+    helicopterCapacity,
+    helicopterMaxWeight,
+    paxDefaultWeight,
+    transportItems,
+    weatherConditions: pick(WEATHER_OPTIONS),
+    operationalNotes: pick(OPERATIONAL_NOTES_OPTIONS),
+  };
 }

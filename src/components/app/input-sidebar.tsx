@@ -21,9 +21,9 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import type { ScenarioData } from '@/lib/types';
-import { Plus, Trash2, Wind, ArrowRight, History, Users, Package } from 'lucide-react';
+import { Plus, Trash2, Wind, ArrowRight, History, Users, Package, Shuffle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { getHistory, deleteScenarioFromHistory } from '@/lib/history';
+import { getHistory, deleteScenarioFromHistory, generateRandomScenario, saveScenarioToHistory } from '@/lib/history';
 import {
   Accordion,
   AccordionContent,
@@ -278,7 +278,24 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                 </>
               ) : (
                  <div>
-                     <h3 className="text-sm font-medium mb-2">Historial</h3>
+                     <div className="flex items-center justify-between mb-3">
+                       <h3 className="text-sm font-medium">Historial</h3>
+                       <Button
+                         type="button"
+                         variant="outline"
+                         size="sm"
+                         className="h-8 text-xs gap-1.5"
+                         onClick={() => {
+                           const randomScenario = generateRandomScenario();
+                           saveScenarioToHistory(randomScenario);
+                           setHistory(getHistory());
+                           toast({ title: 'Ejemplo Generado', description: `Escenario aleatorio con ${randomScenario.transportItems.length} items creado.` });
+                         }}
+                       >
+                         <Shuffle className="h-3.5 w-3.5" />
+                         Generar Ejemplo
+                       </Button>
+                     </div>
                       {history.length > 0 ? (
                         <Accordion type="single" collapsible className="w-full">
                             {history.map((histScenario, index) => (
