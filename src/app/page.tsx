@@ -14,7 +14,7 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle, User, ClipboardList } from 'lucide-react';
+import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle, User, ClipboardList, RefreshCw } from 'lucide-react';
 import { OnboardingTour, OnboardingPrompt, useOnboarding } from '@/components/app/onboarding-tour';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
@@ -64,6 +64,7 @@ export default function Home() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentMapStep, setCurrentMapStep] = useState(0);
   const [authenticated, setAuthenticated] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(false);
 
   // Check session auth on mount
   useEffect(() => {
@@ -84,6 +85,12 @@ export default function Home() {
     return calculatedPlans[shiftId] || null;
   }, [calculatedPlans, activeShift]);
 
+  const alternativePlans = useMemo(() => {
+    return [1, 2]
+      .map(v => calculatedPlans[`alt${v}_${activeShift}`])
+      .filter(Boolean) as FlightPlan[];
+  }, [calculatedPlans, activeShift]);
+
   const handleGeneratePlans = () => {
     if (scenario.transportItems.length === 0) {
         toast({
@@ -98,6 +105,7 @@ export default function Home() {
     setSelectedPlanId(null);
     setActiveView('plans');
     setActiveShift('M');
+    setShowAlternatives(false);
 
     setTimeout(() => {
       try {
@@ -106,8 +114,14 @@ export default function Home() {
 
         for (const shift of shifts) {
             const itemsForShift = scenario.transportItems.filter(item => item.shift === shift);
-            const calculated = runFlightOptimization(itemsForShift, scenario, shift);
+            // Variant 0: optimal plan
+            const calculated = runFlightOptimization(itemsForShift, scenario, shift, 0);
             newCalculatedPlans[calculated.id] = calculated;
+            // Variant 1 & 2: alternatives
+            for (const v of [1, 2]) {
+              const alt = runFlightOptimization(itemsForShift, scenario, shift, v);
+              newCalculatedPlans[alt.id] = alt;
+            }
         }
         
         setBasePlans([{ id: 'optimized', title: 'Plan Óptimo', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } }]);
@@ -276,9 +290,18 @@ export default function Home() {
   
   const handleShiftChange = (shift: 'M' | 'T') => {
     setActiveShift(shift);
-    const newPlanId = `optimized_${shift}`;
-    if (calculatedPlans[newPlanId] && calculatedPlans[newPlanId].steps.length > 0) {
-      setSelectedPlanId(newPlanId);
+    // Try to keep the same plan type but switch shift
+    if (selectedPlanId) {
+      const base = selectedPlanId.replace(/_[MT]$/, '');
+      const newPlanId = `${base}_${shift}`;
+      if (calculatedPlans[newPlanId] && calculatedPlans[newPlanId].steps.length > 0) {
+        setSelectedPlanId(newPlanId);
+        return;
+      }
+    }
+    const defaultId = `optimized_${shift}`;
+    if (calculatedPlans[defaultId] && calculatedPlans[defaultId].steps.length > 0) {
+      setSelectedPlanId(defaultId);
     } else {
       setSelectedPlanId(null);
       if (activeView !== 'plans') {
@@ -322,163 +345,144 @@ export default function Home() {
       </Sidebar>
       <SidebarInset>
         <div className="flex h-full flex-col bg-background">
-          <header className="flex h-16 items-center justify-between border-b bg-card px-6 shadow-sm">
-             <div className="flex items-center gap-4">
-              <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-              <div className="h-6 w-px bg-border mx-2"></div>
-              <div className="flex items-center gap-2">
-                <div className="bg-primary/10 p-1.5 rounded-md">
-                  <Plane className="h-5 w-5 text-primary" />
-                </div>
-                <h1 className='font-bold text-lg tracking-tight'>Logística Aérea <span className="text-muted-foreground font-normal">| Panel de Optimización</span></h1>
+          <header className="flex h-16 items-center justify-between border-b bg-card px-5 shadow-sm">
+             <div className="flex items-center gap-3">
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground h-10 w-10" />
+              <div className="flex items-center gap-2.5">
+                <Plane className="h-5 w-5 text-primary" />
+                <h1 className='font-bold text-base tracking-tight'>Logística Aérea</h1>
               </div>
             </div>
-            <div className='flex items-center gap-3'>
+            <div className='flex items-center gap-2'>
               <WeatherAlert />
-              <div className="h-6 w-px bg-border"></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="shadow-sm">
-                  <Download className="mr-2 h-4 w-4" />
+              <Button variant="ghost" size="sm" onClick={handleDownloadTemplate} className="text-sm h-10 px-3 text-muted-foreground hover:text-foreground">
+                  <Download className="mr-1.5 h-4 w-4" />
                   Plantilla
               </Button>
-              <Button variant="outline" size="sm" onClick={handleImportClick} className="shadow-sm">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Importar Excel
+              <Button variant="ghost" size="sm" onClick={handleImportClick} className="text-sm h-10 px-3 text-muted-foreground hover:text-foreground">
+                  <Upload className="mr-1.5 h-4 w-4" />
+                  Importar
               </Button>
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls" className="hidden" />
-              <div className="h-6 w-px bg-border mx-1"></div>
-              <Button variant="ghost" size="icon" onClick={onboarding.restart} className="h-9 w-9 text-muted-foreground hover:text-primary" title="Recorrido de ayuda">
+              <div className="h-6 w-px bg-border"></div>
+              <Button variant="ghost" size="icon" onClick={onboarding.restart} className="h-10 w-10 text-muted-foreground hover:text-primary" title="Ayuda">
                 <HelpCircle className="h-5 w-5" />
               </Button>
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 text-card-foreground overflow-auto p-4 md:p-8">
+          <main className="flex-1 text-card-foreground overflow-auto p-5 md:p-8">
             {isLoading && <WelcomeScreen isLoading={true} />}
             {!isLoading && basePlans.length === 0 && <WelcomeScreen isLoading={false} />}
             {!isLoading && basePlans.length > 0 && (
-              <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between bg-card p-2 rounded-lg border shadow-sm">
-                    <div className='flex items-center gap-3 px-3'>
-                        <div className="bg-muted p-2 rounded-md">
-                          <CalendarDays className='h-4 w-4 text-primary' />
-                        </div>
-                        <span className="text-sm font-medium text-muted-foreground">Jornada:</span>
+                    <div className='flex items-center gap-2.5 px-2'>
+                        <CalendarDays className='h-4 w-4 text-primary' />
                         <Select value={activeShift} onValueChange={(value) => handleShiftChange(value as 'M' | 'T')}>
-                            <SelectTrigger className="w-[160px] h-9 font-semibold border-none shadow-none focus:ring-0 bg-transparent hover:bg-muted/50 transition-colors">
+                            <SelectTrigger className="w-[160px] h-10 text-sm font-semibold border-none shadow-none focus:ring-0 bg-transparent hover:bg-muted/50 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="M">Turno Mañana</SelectItem>
-                              <SelectItem value="T">Turno Tarde</SelectItem>
+                              <SelectItem value="M">☀ Turno Mañana</SelectItem>
+                              <SelectItem value="T">🌙 Turno Tarde</SelectItem>
                             </SelectContent>
                           </Select>
                     </div>
-                    <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1 border">
-                      <Button variant={activeView === 'plans' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-9 px-4 transition-all">
-                        <ListCollapse className="mr-2 h-4 w-4" />
-                        Resumen del Plan
+                    <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1">
+                      <Button variant={activeView === 'plans' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-10 px-4 text-sm">
+                        <ListCollapse className="mr-1.5 h-4 w-4" />
+                        Resumen
                       </Button>
-                       <Button variant={activeView === 'itinerary' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-9 px-4 transition-all" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
-                        <Milestone className="mr-2 h-4 w-4" />
-                        Desglose en Tabla
+                       <Button variant={activeView === 'itinerary' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-10 px-4 text-sm" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                        <Milestone className="mr-1.5 h-4 w-4" />
+                        Tabla
                       </Button>
-                      <Button variant={activeView === 'map' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="h-9 px-4 transition-all" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
-                        <Map className="mr-2 h-4 w-4" />
-                        Visor Satelital
+                      <Button variant={activeView === 'map' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="h-10 px-4 text-sm" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                        <Map className="mr-1.5 h-4 w-4" />
+                        Mapa
                       </Button>
                     </div>
                 </div>
 
                 {activeView === 'plans' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div>
-                      <h2 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2 text-foreground">
-                        <Wind className="text-primary h-5 w-5" /> 
-                        Plan Operativo Optimizado
-                        <span className="ml-2 text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full border">
-                          Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}
-                        </span>
-                      </h2>
-
-                      {/* Mission briefing bar */}
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      {/* Compact mission briefing — only when data exists */}
                       {scenario.missionDetails && (scenario.missionDetails.pilotInCommand || scenario.missionDetails.aircraftCallsign || scenario.missionDetails.missionObjective) && (
-                        <div className="bg-card border rounded-lg p-3 mb-4 shadow-sm">
-                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground mb-5 px-1">
                             {scenario.missionDetails.aircraftCallsign && (
-                              <div className="flex items-center gap-1.5">
-                                <Plane className="h-3.5 w-3.5 text-primary" />
-                                <span className="text-muted-foreground">Aeronave:</span>
-                                <span className="font-mono font-bold">{scenario.missionDetails.aircraftCallsign}</span>
-                              </div>
+                              <span><Plane className="inline h-4 w-4 mr-1.5 text-primary" /><strong className="text-foreground font-mono">{scenario.missionDetails.aircraftCallsign}</strong></span>
                             )}
                             {scenario.missionDetails.pilotInCommand && (
-                              <div className="flex items-center gap-1.5">
-                                <User className="h-3.5 w-3.5 text-emerald-500" />
-                                <span className="text-muted-foreground">PIC:</span>
-                                <span className="font-semibold">{scenario.missionDetails.pilotInCommand}</span>
-                                {scenario.missionDetails.copilot && (
-                                  <span className="text-muted-foreground">/ SIC: <span className="font-semibold text-foreground">{scenario.missionDetails.copilot}</span></span>
-                                )}
-                              </div>
+                              <span>PIC: <strong className="text-foreground">{scenario.missionDetails.pilotInCommand}</strong>{scenario.missionDetails.copilot && <> / SIC: <strong className="text-foreground">{scenario.missionDetails.copilot}</strong></>}</span>
                             )}
                             {scenario.missionDetails.missionObjective && (
-                              <div className="flex items-center gap-1.5">
-                                <ClipboardList className="h-3.5 w-3.5 text-amber-500" />
-                                <span className="text-muted-foreground">Misión:</span>
-                                <span className="font-semibold">{scenario.missionDetails.missionObjective}</span>
-                              </div>
+                              <span className="truncate max-w-sm">{scenario.missionDetails.missionObjective}</span>
                             )}
                             {scenario.missionDetails.authorization && (
-                              <div className="flex items-center gap-1.5 ml-auto">
-                                <span className="font-mono text-[10px] bg-muted px-2 py-0.5 rounded border">{scenario.missionDetails.authorization}</span>
-                              </div>
+                              <span className="font-mono text-xs bg-muted px-2 py-1 rounded border ml-auto">{scenario.missionDetails.authorization}</span>
                             )}
-                          </div>
-                          {(scenario.weatherConditions || scenario.operationalNotes) && (
-                            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] mt-2 pt-2 border-t border-dashed">
-                              {scenario.weatherConditions && (
-                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                  <Wind className="h-3 w-3 text-blue-500" />
-                                  {scenario.weatherConditions}
-                                </div>
-                              )}
-                              {scenario.operationalNotes && (
-                                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                                  <ShieldCheck className="h-3 w-3" />
-                                  {scenario.operationalNotes}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                            {scenario.weatherConditions && (
+                              <span><Wind className="inline h-4 w-4 mr-1.5 text-blue-500" />{scenario.weatherConditions}</span>
+                            )}
+                            {scenario.operationalNotes && (
+                              <span className="text-amber-600 dark:text-amber-400"><ShieldCheck className="inline h-4 w-4 mr-1.5" />{scenario.operationalNotes}</span>
+                            )}
                         </div>
                       )}
 
-                      <div className="flex items-center gap-4 text-xs bg-muted/50 border rounded-lg p-3 mb-6">
-                        <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
-                        <span className="text-muted-foreground">
-                          <strong className="text-foreground">Reglas activas:</strong> Pasajeros y Carga viajan en vuelos 100% separados.
-                          Turnos Mañana/Tarde no se mezclan. Prioridad: P1=Urgente, P2=Estándar, P3=Baja. Origen obligatorio: Base (BO Nuevo Mundo).
-                        </span>
-                        <div className="flex items-center gap-3 ml-auto shrink-0">
-                          <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-blue-500" /> PAX: {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'PAX').length}</span>
-                          <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-amber-500" /> Carga: {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'CARGO').length}</span>
-                        </div>
+                      {/* Inline counters */}
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-5 px-1">
+                        <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-blue-500" /> {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'PAX').length} PAX</span>
+                        <span className="flex items-center gap-1.5"><Package className="h-4 w-4 text-amber-500" /> {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'CARGO').length} Carga</span>
+                        <span className="text-muted-foreground/50">·</span>
+                        <span>PAX/Carga separados · P1→P2→P3</span>
                       </div>
+
                       <div className="max-w-2xl mx-auto">
                         {planForActiveShift && (
-                          <FlightPlanCard 
-                            plan={planForActiveShift}
-                            onSelectPlan={handlePlanSelection}
-                            isSelected={selectedPlanId === planForActiveShift.id}
-                          />
+                            <div className="space-y-4">
+                            <FlightPlanCard 
+                              plan={planForActiveShift}
+                              onSelectPlan={handlePlanSelection}
+                              isSelected={selectedPlanId === planForActiveShift.id}
+                            />
+                            <div className="flex justify-center">
+                              <Button
+                                variant={showAlternatives ? 'secondary' : 'outline'}
+                                size="default"
+                                onClick={() => setShowAlternatives(v => !v)}
+                                className="shadow-sm h-11 px-5 text-sm"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                {showAlternatives ? 'Ocultar alternativas' : 'Probar otras opciones'}
+                              </Button>
+                            </div>
+                          </div>
                         )}
                         {!planForActiveShift && (
-                          <div className="text-center py-12 text-muted-foreground">
-                            <p className="text-sm">No hay plan calculado para este turno.</p>
+                          <div className="text-center py-16 text-muted-foreground">
+                            <p className="text-base">No hay plan calculado para este turno.</p>
                           </div>
                         )}
                       </div>
-                    </div>
+
+                      {/* Alternative plans */}
+                      {showAlternatives && alternativePlans.length > 0 && (
+                        <div className="max-w-4xl mx-auto mt-5">
+                          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">Alternativas</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {alternativePlans.map(alt => (
+                              <FlightPlanCard
+                                key={alt.id}
+                                plan={alt}
+                                onSelectPlan={handlePlanSelection}
+                                isSelected={selectedPlanId === alt.id}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                   </div>
                 )}
                 

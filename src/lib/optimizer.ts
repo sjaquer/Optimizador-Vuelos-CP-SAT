@@ -23,10 +23,21 @@ function scoreItem(item: TransportItem, currentStation: number): number {
 }
 
 // ──── Agrupación eficiente: items con destinos cercanos ──────────────
-function groupByProximity(items: TransportItem[]): TransportItem[] {
+function groupByProximity(items: TransportItem[], variant: number = 0): TransportItem[] {
   return [...items].sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    return a.destinationStation - b.destinationStation;
+    if (variant === 0) {
+      // Default: prioridad primero, luego destino ascendente
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.destinationStation - b.destinationStation;
+    } else if (variant === 1) {
+      // Variante: prioridad primero, destino descendente (más lejano primero)
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return b.destinationStation - a.destinationStation;
+    } else {
+      // Variante: agrupar por destino, luego por prioridad
+      if (a.destinationStation !== b.destinationStation) return a.destinationStation - b.destinationStation;
+      return a.priority - b.priority;
+    }
   });
 }
 
@@ -34,10 +45,11 @@ function groupByProximity(items: TransportItem[]): TransportItem[] {
 function buildTypeRoute(
   allItems: TransportItem[],
   scenario: ScenarioData,
+  variant: number = 0,
 ): { steps: FlightStep[]; totalDist: number; notDelivered: TransportItem[] } {
   if (allItems.length === 0) return { steps: [], totalDist: 0, notDelivered: [] };
 
-  const pending = groupByProximity(allItems);
+  const pending = groupByProximity(allItems, variant);
   let helicopter: TransportItem[] = [];
   const steps: FlightStep[] = [];
   let currentStation = 0;
@@ -188,13 +200,20 @@ function buildTypeRoute(
 function buildRoute(
   allItems: TransportItem[],
   scenario: ScenarioData,
+  variant: number = 0,
 ): { steps: FlightStep[]; totalDistanceUnits: number; notDelivered: TransportItem[] } {
   const paxItems = allItems.filter(i => i.type === 'PAX');
   const cargoItems = allItems.filter(i => i.type === 'CARGO');
 
-  const bestPax = paxItems.length > 0 ? Math.min(...paxItems.map(i => i.priority)) : Infinity;
-  const bestCargo = cargoItems.length > 0 ? Math.min(...cargoItems.map(i => i.priority)) : Infinity;
-  const typeOrder: ('PAX' | 'CARGO')[] = bestPax <= bestCargo ? ['PAX', 'CARGO'] : ['CARGO', 'PAX'];
+  let typeOrder: ('PAX' | 'CARGO')[];
+  if (variant === 1) {
+    // Variante 1: siempre CARGO primero
+    typeOrder = ['CARGO', 'PAX'];
+  } else {
+    const bestPax = paxItems.length > 0 ? Math.min(...paxItems.map(i => i.priority)) : Infinity;
+    const bestCargo = cargoItems.length > 0 ? Math.min(...cargoItems.map(i => i.priority)) : Infinity;
+    typeOrder = bestPax <= bestCargo ? ['PAX', 'CARGO'] : ['CARGO', 'PAX'];
+  }
 
   const allSteps: FlightStep[] = [];
   let totalDist = 0;
@@ -217,7 +236,7 @@ function buildRoute(
       }
     }
 
-    const result = buildTypeRoute(items, scenario);
+    const result = buildTypeRoute(items, scenario, variant);
     allSteps.push(...result.steps);
     totalDist += result.totalDist;
     allNotDelivered.push(...result.notDelivered);
@@ -270,10 +289,17 @@ function computeMetrics(
 }
 
 // ──── API Pública ────────────────────────────────────────────────────
+const VARIANT_LABELS: Record<number, string> = {
+  0: 'Plan Óptimo',
+  1: 'Alternativa A',
+  2: 'Alternativa B',
+};
+
 export function runFlightOptimization(
   itemsToTransport: TransportItem[],
   scenario: ScenarioData,
-  shift: 'M' | 'T'
+  shift: 'M' | 'T',
+  variant: number = 0,
 ): FlightPlan {
   const emptyMetrics: FlightPlan['metrics'] = {
     totalStops: 0, totalDistance: 0, totalLegs: 0,
@@ -281,8 +307,9 @@ export function runFlightOptimization(
     totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0,
   };
 
-  const planId = `optimized_${shift}`;
-  const planTitle = `Plan Óptimo — Turno ${shift === 'M' ? 'Mañana' : 'Tarde'}`;
+  const planId = variant === 0 ? `optimized_${shift}` : `alt${variant}_${shift}`;
+  const label = VARIANT_LABELS[variant] || `Alternativa ${variant}`;
+  const planTitle = `${label} — Turno ${shift === 'M' ? 'Mañana' : 'Tarde'}`;
 
   if (itemsToTransport.length === 0) {
     return {
@@ -306,13 +333,17 @@ export function runFlightOptimization(
     return [item];
   });
 
-  const { steps, totalDistanceUnits, notDelivered } = buildRoute(expandedItems, scenario);
+  const { steps, totalDistanceUnits, notDelivered } = buildRoute(expandedItems, scenario, variant);
   const metrics = computeMetrics(steps, totalDistanceUnits, scenario, notDelivered);
 
   return {
     id: planId,
     title: planTitle,
-    description: 'Optimización única: máxima eficiencia con penalización por prioridad. PAX y Carga en vuelos separados. Agrupación de tramos consecutivos.',
+    description: variant === 0
+      ? 'Optimización óptima: máxima eficiencia con penalización por prioridad. PAX y Carga en vuelos separados.'
+      : variant === 1
+      ? 'Alternativa con destinos lejanos primero y priorización de carga. PAX y Carga separados.'
+      : 'Alternativa agrupando por zona de destino. PAX y Carga separados.',
     steps,
     metrics,
   };
