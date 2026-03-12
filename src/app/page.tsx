@@ -345,42 +345,42 @@ export default function Home() {
       </Sidebar>
       <SidebarInset>
         <div className="flex h-full flex-col bg-background">
-          <header className="flex h-16 items-center justify-between border-b bg-card px-5 shadow-sm">
-             <div className="flex items-center gap-3">
-              <SidebarTrigger className="text-muted-foreground hover:text-foreground h-10 w-10" />
-              <div className="flex items-center gap-2.5">
+          <header className="flex h-14 sm:h-16 items-center justify-between border-b bg-card px-3 sm:px-5 shadow-sm">
+             <div className="flex items-center gap-2 sm:gap-3">
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground h-9 w-9 sm:h-10 sm:w-10" />
+              <div className="flex items-center gap-2">
                 <Plane className="h-5 w-5 text-primary" />
-                <h1 className='font-bold text-base tracking-tight'>Logística Aérea</h1>
+                <h1 className='font-bold text-sm sm:text-base tracking-tight'>Logística Aérea</h1>
               </div>
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-1 sm:gap-2'>
               <WeatherAlert />
-              <Button variant="ghost" size="sm" onClick={handleDownloadTemplate} className="text-sm h-10 px-3 text-muted-foreground hover:text-foreground">
-                  <Download className="mr-1.5 h-4 w-4" />
-                  Plantilla
+              <Button variant="ghost" size="sm" onClick={handleDownloadTemplate} className="text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-3 text-muted-foreground hover:text-foreground">
+                  <Download className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Plantilla</span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleImportClick} className="text-sm h-10 px-3 text-muted-foreground hover:text-foreground">
-                  <Upload className="mr-1.5 h-4 w-4" />
-                  Importar
+              <Button variant="ghost" size="sm" onClick={handleImportClick} className="text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-3 text-muted-foreground hover:text-foreground">
+                  <Upload className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Importar</span>
               </Button>
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls" className="hidden" />
-              <div className="h-6 w-px bg-border"></div>
-              <Button variant="ghost" size="icon" onClick={onboarding.restart} className="h-10 w-10 text-muted-foreground hover:text-primary" title="Ayuda">
+              <div className="hidden sm:block h-6 w-px bg-border"></div>
+              <Button variant="ghost" size="icon" onClick={onboarding.restart} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground hover:text-primary" title="Ayuda">
                 <HelpCircle className="h-5 w-5" />
               </Button>
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 text-card-foreground overflow-auto p-5 md:p-8">
+          <main className="flex-1 text-card-foreground overflow-auto p-3 sm:p-5 md:p-8">
             {isLoading && <WelcomeScreen isLoading={true} />}
             {!isLoading && basePlans.length === 0 && <WelcomeScreen isLoading={false} />}
             {!isLoading && basePlans.length > 0 && (
               <div className="flex flex-col gap-6">
-                <div className="flex items-center justify-between bg-card p-2 rounded-lg border shadow-sm">
-                    <div className='flex items-center gap-2.5 px-2'>
-                        <CalendarDays className='h-4 w-4 text-primary' />
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-card p-2 rounded-lg border shadow-sm">
+                    <div className='flex items-center gap-2 px-1 sm:px-2'>
+                        <CalendarDays className='h-4 w-4 text-primary shrink-0' />
                         <Select value={activeShift} onValueChange={(value) => handleShiftChange(value as 'M' | 'T')}>
-                            <SelectTrigger className="w-[160px] h-10 text-sm font-semibold border-none shadow-none focus:ring-0 bg-transparent hover:bg-muted/50 transition-colors">
+                            <SelectTrigger className="w-full sm:w-[160px] h-9 sm:h-10 text-sm font-semibold border-none shadow-none focus:ring-0 bg-transparent hover:bg-muted/50 transition-colors">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -390,16 +390,16 @@ export default function Home() {
                           </Select>
                     </div>
                     <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1">
-                      <Button variant={activeView === 'plans' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-10 px-4 text-sm">
-                        <ListCollapse className="mr-1.5 h-4 w-4" />
+                      <Button variant={activeView === 'plans' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm">
+                        <ListCollapse className="mr-1 sm:mr-1.5 h-4 w-4" />
                         Resumen
                       </Button>
-                       <Button variant={activeView === 'itinerary' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-10 px-4 text-sm" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
-                        <Milestone className="mr-1.5 h-4 w-4" />
+                       <Button variant={activeView === 'itinerary' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                        <Milestone className="mr-1 sm:mr-1.5 h-4 w-4" />
                         Tabla
                       </Button>
-                      <Button variant={activeView === 'map' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="h-10 px-4 text-sm" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
-                        <Map className="mr-1.5 h-4 w-4" />
+                      <Button variant={activeView === 'map' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('map')} className="flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
+                        <Map className="mr-1 sm:mr-1.5 h-4 w-4" />
                         Mapa
                       </Button>
                     </div>
@@ -409,7 +409,7 @@ export default function Home() {
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                       {/* Compact mission briefing — only when data exists */}
                       {scenario.missionDetails && (scenario.missionDetails.pilotInCommand || scenario.missionDetails.aircraftCallsign || scenario.missionDetails.missionObjective) && (
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground mb-5 px-1">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 px-1">
                             {scenario.missionDetails.aircraftCallsign && (
                               <span><Plane className="inline h-4 w-4 mr-1.5 text-primary" /><strong className="text-foreground font-mono">{scenario.missionDetails.aircraftCallsign}</strong></span>
                             )}
@@ -432,16 +432,16 @@ export default function Home() {
                       )}
 
                       {/* Inline counters */}
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-5 px-1">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 px-1">
                         <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-blue-500" /> {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'PAX').length} PAX</span>
                         <span className="flex items-center gap-1.5"><Package className="h-4 w-4 text-amber-500" /> {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'CARGO').length} Carga</span>
-                        <span className="text-muted-foreground/50">·</span>
-                        <span>PAX/Carga separados · P1→P2→P3</span>
+                        <span className="text-muted-foreground/50 hidden sm:inline">·</span>
+                        <span className="hidden sm:inline">PAX/Carga separados · P1→P2→P3</span>
                       </div>
 
-                      <div className="max-w-2xl mx-auto">
+                      <div className="max-w-2xl mx-auto px-0 sm:px-0">
                         {planForActiveShift && (
-                            <div className="space-y-4">
+                            <div className="space-y-3 sm:space-y-4">
                             <FlightPlanCard 
                               plan={planForActiveShift}
                               onSelectPlan={handlePlanSelection}
@@ -452,7 +452,7 @@ export default function Home() {
                                 variant={showAlternatives ? 'secondary' : 'outline'}
                                 size="default"
                                 onClick={() => setShowAlternatives(v => !v)}
-                                className="shadow-sm h-11 px-5 text-sm"
+                                className="shadow-sm h-10 sm:h-11 px-4 sm:px-5 text-xs sm:text-sm"
                               >
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 {showAlternatives ? 'Ocultar alternativas' : 'Probar otras opciones'}
@@ -489,15 +489,23 @@ export default function Home() {
                 {activeView === 'itinerary' && selectedPlan && <FlightItinerary plan={selectedPlan} />}
 
                 {activeView === 'map' && selectedPlan && (
-                  <div className='grid grid-cols-1 xl:grid-cols-[300px_1fr_300px] gap-6 items-start'>
-                     <StationLegend numStations={scenario.numStations} />
-                     <RouteMap 
-                        plan={selectedPlan}
-                        numStations={scenario.numStations}
-                        currentStep={currentMapStep}
-                        onStepChange={setCurrentMapStep}
-                    />
-                    <div className='flex flex-col gap-6'>
+                  <div className='grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[250px_1fr_280px] gap-4 sm:gap-6 items-start'>
+                     <div className="hidden xl:block">
+                       <StationLegend numStations={scenario.numStations} />
+                     </div>
+                     <div className="col-span-1 lg:col-span-1">
+                       <RouteMap 
+                          plan={selectedPlan}
+                          numStations={scenario.numStations}
+                          currentStep={currentMapStep}
+                          onStepChange={setCurrentMapStep}
+                      />
+                      {/* Station legend below map on mobile/tablet */}
+                      <div className="xl:hidden mt-4">
+                        <StationLegend numStations={scenario.numStations} />
+                      </div>
+                     </div>
+                    <div className='flex flex-col gap-4 sm:gap-6'>
                       <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
                     </div>
                   </div>

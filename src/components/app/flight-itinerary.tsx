@@ -10,6 +10,7 @@ import type { FlightPlan, TransportItem, FlightStep } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileDown, RotateCw, Route, Gauge, Milestone } from 'lucide-react';
 import { Fragment, useMemo } from 'react';
 import { stationNamesMap } from '@/lib/stations';
+import { useToast } from '@/hooks/use-toast';
 
 interface FlightItineraryProps {
   plan: FlightPlan;
@@ -30,6 +31,7 @@ const getFlightNum = (notes: string): number | null => {
 };
 
 export function FlightItinerary({ plan }: FlightItineraryProps) {
+  const { toast } = useToast();
   const getActionIcon = (action: FlightStep['action']) => {
     switch (action) {
       case 'PICKUP': return <PlaneTakeoff className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />;
@@ -74,6 +76,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
   }, [plan]);
 
   const exportToPDF = async () => {
+    try {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF({ orientation: 'landscape' });
@@ -158,9 +161,14 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
       },
     });
     doc.save(`plan_${strategy}_${shift}.pdf`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      toast({ variant: 'destructive', title: 'Error de Exportación', description: 'No se pudo generar el PDF. Intenta de nuevo o usa la exportación a Excel.' });
+    }
   };
 
   const exportToExcel = async () => {
+    try {
     const ExcelJS = await import('exceljs');
     const wb = new ExcelJS.Workbook();
     
@@ -262,12 +270,16 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al exportar Excel:', error);
+      toast({ variant: 'destructive', title: 'Error de Exportación', description: 'No se pudo generar el archivo Excel. Intenta de nuevo.' });
+    }
   };
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Metrics summary bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
         {[
           { icon: <Route className="h-5 w-5" />, label: 'Distancia', value: `${metrics.totalDistance.toFixed(0)}`, unit: 'tramos' },
           { icon: <PlaneTakeoff className="h-5 w-5" />, label: 'Vuelos', value: `${metrics.totalFlights}`, unit: '' },
@@ -276,20 +288,20 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
           { icon: <Package className="h-5 w-5 text-amber-500" />, label: 'Carga', value: `${summary.cargoCount}`, unit: `${summary.cargoWeight} kg` },
           { icon: <Gauge className="h-5 w-5" />, label: 'Carga prom.', value: `${Math.round(metrics.avgLoadRatio * 100)}%`, unit: '' },
         ].map((m) => (
-          <div key={m.label} className="bg-card border rounded-lg p-4 text-center shadow-sm">
-            <div className="flex justify-center mb-1.5 text-primary">{m.icon}</div>
-            <div className="text-2xl font-bold tabular-nums">{m.value}</div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wider mt-0.5">{m.label}{m.unit ? ` · ${m.unit}` : ''}</div>
+          <div key={m.label} className="bg-card border rounded-lg p-3 sm:p-4 text-center shadow-sm">
+            <div className="flex justify-center mb-1 sm:mb-1.5 text-primary">{m.icon}</div>
+            <div className="text-xl sm:text-2xl font-bold tabular-nums">{m.value}</div>
+            <div className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider mt-0.5">{m.label}{m.unit ? ` · ${m.unit}` : ''}</div>
           </div>
         ))}
       </div>
 
       {/* Itinerary table */}
       <Card className="shadow-sm">
-        <CardHeader className='flex-row items-center justify-between'>
-          <div>
-            <CardTitle className="text-lg">{plan.title}</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">Itinerario paso a paso · {plan.steps.length} pasos</p>
+        <CardHeader className='flex-row items-center justify-between gap-2 flex-wrap'>
+          <div className="min-w-0">
+            <CardTitle className="text-base sm:text-lg truncate">{plan.title}</CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">Itinerario · {plan.steps.length} pasos</p>
           </div>
           <DropdownMenu>
               <DropdownMenuTrigger asChild>

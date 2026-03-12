@@ -160,9 +160,14 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
     <Form {...form}>
       <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
         <div className="flex min-h-0 flex-1 flex-col">
-          <SidebarHeader className="group-data-[collapsible=icon]:hidden border-b pb-4 mb-2 bg-muted/20">
-              <div className='flex items-center justify-between'>
-                <h2 className='font-bold text-primary tracking-tight'>Control de Escenario</h2>
+          <SidebarHeader className="group-data-[collapsible=icon]:hidden border-b pb-3 bg-gradient-to-b from-primary/5 to-transparent">
+              <div className='flex items-center justify-between px-1'>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Plane className="h-4 w-4 text-primary" />
+                  </div>
+                  <h2 className='font-bold text-primary tracking-tight text-sm'>Control de Escenario</h2>
+                </div>
                 <Button
                   variant={activeView === 'history' ? 'default' : 'outline'}
                   size="icon"
@@ -182,54 +187,54 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
             <div className="space-y-6 p-4 group-data-[collapsible=icon]:hidden">
                {activeView === 'editor' ? (
                 <>
-                  <div className="bg-card border rounded-lg p-3 shadow-sm">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2"><FileText className="h-4 w-4"/> Briefing de Misión</h3>
+                  <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1 flex items-center gap-2"><FileText className="h-3.5 w-3.5"/> Briefing de Misión</h3>
                     <Accordion type="multiple" defaultValue={['weather', 'crew']} className="w-full">
-                      <AccordionItem value="weather" className="border-b-0">
-                        <AccordionTrigger className="py-2.5 text-sm font-semibold text-muted-foreground hover:no-underline">
-                          <span className="flex items-center gap-2"><Wind className="h-4 w-4 text-blue-500"/> Condiciones Meteorológicas</span>
+                      <AccordionItem value="weather" className="border-b border-border/50 last:border-b-0">
+                        <AccordionTrigger className="py-2 px-3 text-xs font-semibold text-muted-foreground hover:no-underline hover:bg-muted/30 transition-colors">
+                          <span className="flex items-center gap-2"><Wind className="h-3.5 w-3.5 text-blue-500"/> Meteorología</span>
                         </AccordionTrigger>
-                        <AccordionContent className="pt-1 pb-3">
-                          <div className="space-y-3">
+                        <AccordionContent className="px-3 pt-1 pb-3">
+                          <div className="space-y-2">
                             <FormField control={form.control} name="weatherConditions" render={({ field }) => (
                               <FormItem>
-                                <FormControl><Input placeholder="Ej: CAVOK, viento 10kt NNO, techo 3000ft" className="text-sm h-10 bg-background border-border" {...field} /></FormControl>
+                                <FormControl><Input placeholder="Ej: CAVOK, viento 10kt NNO" className="text-sm h-9 bg-background border-border" {...field} /></FormControl>
                               </FormItem>
                             )}/>
                             <FormField control={form.control} name="operationalNotes" render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Restricciones / Alertas</FormLabel>
-                                <FormControl><Textarea placeholder="Ventana operativa, restricciones de helipuerto, NOTAMs activos..." className="text-sm min-h-[64px] bg-background border-border resize-none" {...field} /></FormControl>
+                                <FormControl><Textarea placeholder="NOTAMs, restricciones..." className="text-sm min-h-[56px] bg-background border-border resize-none" {...field} /></FormControl>
                               </FormItem>
                             )}/>
                           </div>
                         </AccordionContent>
                       </AccordionItem>
 
-                      <AccordionItem value="crew" className="border-b-0">
-                        <AccordionTrigger className="py-2.5 text-sm font-semibold text-muted-foreground hover:no-underline">
-                          <span className="flex items-center gap-2"><User className="h-4 w-4 text-emerald-500"/> Tripulación y Aeronave</span>
+                      <AccordionItem value="crew" className="border-b border-border/50 last:border-b-0">
+                        <AccordionTrigger className="py-2 px-3 text-xs font-semibold text-muted-foreground hover:no-underline hover:bg-muted/30 transition-colors">
+                          <span className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-emerald-500"/> Tripulación y Aeronave</span>
                         </AccordionTrigger>
-                        <AccordionContent className="pt-1 pb-3">
-                          <div className="space-y-3">
+                        <AccordionContent className="px-3 pt-1 pb-3">
+                          <div className="space-y-2">
                             <div className="grid grid-cols-2 gap-2">
                               <FormField control={form.control} name="missionDetails.pilotInCommand" render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Piloto al Mando</FormLabel>
-                                  <FormControl><Input placeholder="Nombre PIC" className="text-sm h-10 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">PIC</FormLabel>
+                                  <FormControl><Input placeholder="Piloto" className="text-sm h-9 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
                                 </FormItem>
                               )}/>
                               <FormField control={form.control} name="missionDetails.copilot" render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Copiloto / SIC</FormLabel>
-                                  <FormControl><Input placeholder="Nombre SIC" className="text-sm h-10 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">SIC</FormLabel>
+                                  <FormControl><Input placeholder="Copiloto" className="text-sm h-9 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
                                 </FormItem>
                               )}/>
                             </div>
                             <FormField control={form.control} name="missionDetails.aircraftCallsign" render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Matrícula / Callsign</FormLabel>
-                                <FormControl><Input placeholder="Ej: OB-2145-P" className="text-sm h-10 bg-background border-border font-mono uppercase" {...field} value={field.value || ''} /></FormControl>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Matrícula</FormLabel>
+                                <FormControl><Input placeholder="OB-2145-P" className="text-sm h-9 bg-background border-border font-mono uppercase" {...field} value={field.value || ''} /></FormControl>
                               </FormItem>
                             )}/>
                           </div>
@@ -237,35 +242,35 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                       </AccordionItem>
 
                       <AccordionItem value="mission" className="border-b-0">
-                        <AccordionTrigger className="py-2.5 text-sm font-semibold text-muted-foreground hover:no-underline">
-                          <span className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-amber-500"/> Detalle de Misión</span>
+                        <AccordionTrigger className="py-2 px-3 text-xs font-semibold text-muted-foreground hover:no-underline hover:bg-muted/30 transition-colors">
+                          <span className="flex items-center gap-2"><ClipboardList className="h-3.5 w-3.5 text-amber-500"/> Detalle de Misión</span>
                         </AccordionTrigger>
-                        <AccordionContent className="pt-1 pb-3">
-                          <div className="space-y-3">
+                        <AccordionContent className="px-3 pt-1 pb-3">
+                          <div className="space-y-2">
                             <FormField control={form.control} name="missionDetails.missionObjective" render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Objetivo de Misión</FormLabel>
-                                <FormControl><Input placeholder="Ej: Rotación de personal turno 14D" className="text-sm h-10 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Objetivo</FormLabel>
+                                <FormControl><Input placeholder="Rotación de personal turno 14D" className="text-sm h-9 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
                               </FormItem>
                             )}/>
                             <div className="grid grid-cols-2 gap-2">
                               <FormField control={form.control} name="missionDetails.clientOrProject" render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Cliente / Proyecto</FormLabel>
-                                  <FormControl><Input placeholder="Nombre del proyecto" className="text-sm h-10 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Cliente</FormLabel>
+                                  <FormControl><Input placeholder="Proyecto" className="text-sm h-9 bg-background border-border" {...field} value={field.value || ''} /></FormControl>
                                 </FormItem>
                               )}/>
                               <FormField control={form.control} name="missionDetails.authorization" render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">N° Autorización</FormLabel>
-                                  <FormControl><Input placeholder="AUTH-XXXX" className="text-sm h-10 bg-background border-border font-mono" {...field} value={field.value || ''} /></FormControl>
+                                  <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">N° Auth</FormLabel>
+                                  <FormControl><Input placeholder="AUTH-XXXX" className="text-sm h-9 bg-background border-border font-mono" {...field} value={field.value || ''} /></FormControl>
                                 </FormItem>
                               )}/>
                             </div>
                             <FormField control={form.control} name="missionDetails.missionNotes" render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Notas Adicionales de Misión</FormLabel>
-                                <FormControl><Textarea placeholder="Información adicional, coordinaciones especiales, frecuencias radio, contactos en tierra..." className="text-sm min-h-[72px] bg-background border-border resize-none" {...field} value={field.value || ''} /></FormControl>
+                                <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Notas</FormLabel>
+                                <FormControl><Textarea placeholder="Coordinaciones, frecuencias, contactos..." className="text-sm min-h-[56px] bg-background border-border resize-none" {...field} value={field.value || ''} /></FormControl>
                               </FormItem>
                             )}/>
                           </div>
@@ -274,59 +279,59 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                     </Accordion>
                   </div>
 
-                  <div className="bg-card border rounded-lg p-4 shadow-sm">
-                     <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">Config. Aeronave</h3>
-                     <div className="grid grid-cols-2 gap-3">
-                        <FormField control={form.control} name="numStations" render={({ field }) => ( <FormItem><FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Estaciones Activas</FormLabel><FormControl><Input type="number" className="h-10 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
-                        <FormField control={form.control} name="helicopterCapacity" render={({ field }) => ( <FormItem><FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Capacidad (Asientos)</FormLabel><FormControl><Input type="number" className="h-10 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
-                        <FormField control={form.control} name="helicopterMaxWeight" render={({ field }) => ( <FormItem><FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Carga Máxima (kg)</FormLabel><FormControl><Input type="number" className="h-10 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
-                        <FormField control={form.control} name="paxDefaultWeight" render={({ field }) => ( <FormItem><FormLabel className="text-xs uppercase font-semibold text-muted-foreground">Peso PAX Estándar</FormLabel><FormControl><Input type="number" className="h-10 font-medium bg-background" {...field} /></FormControl></FormItem> )}/>
+                  <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-2 flex items-center gap-1.5">Config. Aeronave</h3>
+                     <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+                        <FormField control={form.control} name="numStations" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Estaciones</FormLabel><FormControl><Input type="number" className="h-9 font-medium bg-background text-sm" {...field} /></FormControl></FormItem> )}/>
+                        <FormField control={form.control} name="helicopterCapacity" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Asientos</FormLabel><FormControl><Input type="number" className="h-9 font-medium bg-background text-sm" {...field} /></FormControl></FormItem> )}/>
+                        <FormField control={form.control} name="helicopterMaxWeight" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Carga Máx (kg)</FormLabel><FormControl><Input type="number" className="h-9 font-medium bg-background text-sm" {...field} /></FormControl></FormItem> )}/>
+                        <FormField control={form.control} name="paxDefaultWeight" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Peso PAX</FormLabel><FormControl><Input type="number" className="h-9 font-medium bg-background text-sm" {...field} /></FormControl></FormItem> )}/>
                      </div>
                      <FormMessage className="text-xs mt-2">{form.formState.errors.numStations?.message || form.formState.errors.helicopterCapacity?.message || form.formState.errors.helicopterMaxWeight?.message}</FormMessage>
                   </div>
                   
-                  <div className="bg-card border rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">Requerimientos</h3>
+                  <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-3 pt-3 pb-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">Requerimientos <span className="text-primary font-mono">({fields.length})</span></h3>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3 px-3 pb-3">
                       {fields.map((field, index) => {
                         const itemType = watchedItems[index]?.type;
                         const isPax = itemType === 'PAX';
                         return (
-                          <div key={field.id} className={`flex flex-col gap-3 rounded-lg border p-4 relative group ${isPax ? 'bg-blue-500/5 border-blue-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
-                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                          <div key={field.id} className={`flex flex-col gap-2.5 rounded-lg border p-3 relative group transition-colors ${isPax ? 'bg-blue-500/5 border-blue-500/20 hover:border-blue-500/40' : 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40'}`}>
+                            <Button type="button" variant="ghost" size="icon" className="absolute top-1.5 right-1.5 h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             
-                            <div className="flex items-center gap-2 pr-8">
-                              <span className={`text-xs font-bold px-2 py-1 rounded flex items-center gap-1.5 ${isPax ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
-                                {isPax ? <Users className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+                            <div className="flex items-center gap-2 pr-7">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isPax ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
+                                {isPax ? <Users className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
                                 #{index + 1}
                               </span>
-                              <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem className="flex-1 space-y-0.5"><FormControl><Input className="h-9 text-sm bg-background" placeholder="Área" {...field} /></FormControl></FormItem> )}/>
+                              <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><FormControl><Input className="h-8 text-sm bg-background" placeholder="Área" {...field} /></FormControl></FormItem> )}/>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2">
-                                <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => ( <FormItem className="space-y-1"><FormLabel className="text-xs">TIPO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-9 text-sm bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGA</SelectItem></SelectContent></Select></FormItem> )}/>
-                                <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => ( <FormItem className="space-y-1"><FormLabel className="text-xs">TRN</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-9 text-sm bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="M">MAÑ</SelectItem><SelectItem value="T">TAR</SelectItem></SelectContent></Select></FormItem> )}/>
-                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-1"><FormLabel className="text-xs">PRIO</FormLabel><Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}><FormControl><SelectTrigger className="h-9 text-sm bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">P1 - Urgente</SelectItem><SelectItem value="2">P2 - Estándar</SelectItem><SelectItem value="3">P3 - Baja</SelectItem></SelectContent></Select></FormItem> )}/>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TIPO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGA</SelectItem></SelectContent></Select></FormItem> )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TRN</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="M">MAÑ</SelectItem><SelectItem value="T">TAR</SelectItem></SelectContent></Select></FormItem> )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PRIO</FormLabel><Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">P1</SelectItem><SelectItem value="2">P2</SelectItem><SelectItem value="3">P3</SelectItem></SelectContent></Select></FormItem> )}/>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-2">
-                               <FormField control={form.control} name={`transportItems.${index}.quantity`} render={({ field }) => ( <FormItem className="space-y-1"><FormLabel className="text-xs">CANTIDAD</FormLabel><FormControl><Input type="number" min="1" placeholder="1" className="h-9 text-sm bg-background" {...field} disabled={!isPax} value={isPax ? field.value || 1 : 1} /></FormControl></FormItem> )}/>
-                               <FormField control={form.control} name={`transportItems.${index}.weight`} render={({ field }) => ( <FormItem className="space-y-1"><FormLabel className="text-xs">PESO (kg)</FormLabel><FormControl><Input type="number" className="h-9 text-sm bg-background" {...field} disabled={isPax} placeholder={isPax ? `${form.watch('paxDefaultWeight') || 80}` : '0'} value={isPax ? '' : field.value || ''} /></FormControl></FormItem> )}/>
+                            <div className="grid grid-cols-2 gap-1.5">
+                               <FormField control={form.control} name={`transportItems.${index}.quantity`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">CANT</FormLabel><FormControl><Input type="number" min="1" placeholder="1" className="h-8 text-sm bg-background" {...field} disabled={!isPax} value={isPax ? field.value || 1 : 1} /></FormControl></FormItem> )}/>
+                               <FormField control={form.control} name={`transportItems.${index}.weight`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PESO (kg)</FormLabel><FormControl><Input type="number" className="h-8 text-sm bg-background" {...field} disabled={isPax} placeholder={isPax ? `${form.watch('paxDefaultWeight') || 80}` : '0'} value={isPax ? '' : field.value || ''} /></FormControl></FormItem> )}/>
                             </div>
                             
                             {!isPax && (
-                              <FormField control={form.control} name={`transportItems.${index}.description`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormControl><Input placeholder="Describir carga..." className="h-9 text-sm bg-background" {...field} value={field.value || ''} /></FormControl></FormItem> )}/>
+                              <FormField control={form.control} name={`transportItems.${index}.description`} render={({ field }) => ( <FormItem className="space-y-0"><FormControl><Input placeholder="Describir carga..." className="h-8 text-sm bg-background" {...field} value={field.value || ''} /></FormControl></FormItem> )}/>
                             )}
 
-                            <div className="flex items-center justify-between gap-2 bg-background p-2 rounded-lg border border-border">
+                            <div className="flex items-center justify-between gap-1.5 bg-background p-1.5 rounded-md border border-border">
                                 <Controller control={form.control} name={`transportItems.${index}.originStation`} render={({ field }) => (
                                   <FormItem className="flex-1 space-y-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-xs font-medium text-muted-foreground w-7">ORG</span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] font-bold text-muted-foreground w-6">ORG</span>
                                       <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}>
-                                        <FormControl><SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Origen" /></SelectTrigger></FormControl>
+                                        <FormControl><SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Origen" /></SelectTrigger></FormControl>
                                         <SelectContent>
                                           {getActiveStations(maxStation).map(s => (
                                             <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
@@ -336,13 +341,13 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                                     </div>
                                   </FormItem>
                                 )}/>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                 <Controller control={form.control} name={`transportItems.${index}.destinationStation`} render={({ field }) => (
                                   <FormItem className="flex-1 space-y-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-xs font-medium text-muted-foreground w-7">DST</span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] font-bold text-muted-foreground w-6">DST</span>
                                       <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}>
-                                        <FormControl><SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Destino" /></SelectTrigger></FormControl>
+                                        <FormControl><SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Destino" /></SelectTrigger></FormControl>
                                         <SelectContent>
                                           {getActiveStations(maxStation).map(s => (
                                             <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
@@ -357,7 +362,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           </div>
                         );
                       })}
-                      <Button type="button" variant="outline" className="w-full h-11 text-sm" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 2, quantity: 1, originStation: 0, destinationStation: 1, weight: 80, description: '' })}>
+                      <Button type="button" variant="outline" className="w-full h-10 text-sm border-dashed hover:border-solid hover:border-primary/40 hover:bg-primary/5 transition-all" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 2, quantity: 1, originStation: 0, destinationStation: 1, weight: 80, description: '' })}>
                         <Plus className="mr-2 h-4 w-4" /> Agregar Item
                       </Button>
                     </div>
@@ -479,13 +484,13 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
           </div>
         </div>
 
-        <SidebarFooter className="group-data-[collapsible=icon]:hidden p-4 border-t bg-card/50">
-          <Button type="submit" disabled={isLoading} className="w-full h-11 font-bold shadow-md relative overflow-hidden group">
+        <SidebarFooter className="group-data-[collapsible=icon]:hidden p-3 border-t bg-card/80 backdrop-blur-sm">
+          <Button type="submit" disabled={isLoading} className="w-full h-11 font-bold shadow-lg relative overflow-hidden group text-sm">
             {isLoading ? (
-              <><Wind className="mr-2 h-5 w-5 animate-spin" /> Optimizando Plan...</>
+              <><Wind className="mr-2 h-4 w-4 animate-spin" /> Optimizando...</>
             ) : (
               <span className="flex items-center justify-center relative z-10 transition-transform group-hover:gap-2">
-                 Calcular Plan Operativo <ArrowRight className="ml-2 h-5 w-5 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all" />
+                 Calcular Plan Operativo <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all" />
               </span>
             )}
           </Button>

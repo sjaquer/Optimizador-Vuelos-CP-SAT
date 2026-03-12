@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    optimizePackageImports: ['jspdf', 'jspdf-autotable', 'exceljs'],
+  },
   // Disable source maps in production to prevent code inspection
   productionBrowserSourceMaps: false,
   images: {

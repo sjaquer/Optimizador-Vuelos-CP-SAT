@@ -61,9 +61,9 @@ export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCar
       {isSelected && (
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-primary/80 to-primary"></div>
       )}
-      <CardHeader className="pb-2 pt-5 px-5">
-        <div className='flex items-center gap-3'>
-            <CardTitle className='text-lg font-bold leading-tight'>{displayedPlan.title}</CardTitle>
+      <CardHeader className="pb-2 pt-4 sm:pt-5 px-4 sm:px-5">
+        <div className='flex items-center gap-2 sm:gap-3 flex-wrap'>
+            <CardTitle className='text-base sm:text-lg font-bold leading-tight'>{displayedPlan.title}</CardTitle>
             <Badge variant="outline" className={cn("text-xs px-2.5 py-0.5", shift === 'M' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30')}>
               {shift === 'M' ? '☀ Mañana' : '🌙 Tarde'}
             </Badge>
@@ -72,26 +72,26 @@ export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCar
       </CardHeader>
       
       {hasContent ? (
-        <CardContent className="flex-1 flex flex-col justify-end pt-0 px-5 pb-5">
+        <CardContent className="flex-1 flex flex-col justify-end pt-0 px-4 sm:px-5 pb-4 sm:pb-5">
           {/* Key metrics row */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-background rounded-lg border p-3 text-center">
-              <div className="text-2xl font-bold tabular-nums leading-tight">{metrics.totalDistance.toFixed(0)}</div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Tramos</span>
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+            <div className="bg-background rounded-lg border p-2 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold tabular-nums leading-tight">{metrics.totalDistance.toFixed(0)}</div>
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Tramos</span>
             </div>
-            <div className="bg-background rounded-lg border p-3 text-center">
-              <div className="text-2xl font-bold tabular-nums leading-tight">{metrics.totalFlights}</div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Vuelos</span>
+            <div className="bg-background rounded-lg border p-2 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold tabular-nums leading-tight">{metrics.totalFlights}</div>
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Vuelos</span>
             </div>
-            <div className="bg-background rounded-lg border p-3 text-center">
-              <div className="text-2xl font-bold tabular-nums leading-tight">{metrics.totalStops}</div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Paradas</span>
+            <div className="bg-background rounded-lg border p-2 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold tabular-nums leading-tight">{metrics.totalStops}</div>
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Paradas</span>
             </div>
           </div>
 
           {/* Compact info row: deliveries + load */}
-          <div className="flex items-center justify-between text-sm mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between text-xs sm:text-sm mb-3 sm:mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
               {paxDeliveredCount > 0 && (
                 <span className="flex items-center gap-1.5 font-medium text-blue-700 dark:text-blue-300"><User className="h-4 w-4" /> {paxDeliveredCount} PAX</span>
               )}
