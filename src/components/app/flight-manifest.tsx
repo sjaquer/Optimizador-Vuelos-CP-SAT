@@ -80,28 +80,28 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
 
   return (
     <Card className="shadow-sm border-border/70">
-      <CardHeader className="bg-muted/30 border-b pb-4">
-        <CardTitle className="text-lg flex items-center gap-2 tracking-tight">
-            <Waypoints className="h-5 w-5 text-primary"/>
+      <CardHeader className="bg-muted/30 border-b pb-3 sm:pb-4">
+        <CardTitle className="text-base sm:text-lg flex items-center gap-2 tracking-tight">
+            <Waypoints className="h-4 w-4 sm:h-5 sm:w-5 text-primary"/>
             Manifiesto de Escala
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
+      <CardContent className="pt-4 sm:pt-6">
         {manifestData ? (
-          <div className="space-y-5">
-             <div className="flex items-center justify-center text-center bg-background border rounded-lg p-3 shadow-sm mx-auto">
+          <div className="space-y-4 sm:space-y-5">
+             <div className="flex items-center justify-center text-center bg-background border rounded-lg p-2.5 sm:p-3 shadow-sm mx-auto">
                 <div className="flex flex-col items-center">
                   <span className="text-[10px] text-muted-foreground uppercase">Desde</span>
-                  <span className='font-bold text-sm'>{sName(manifestData.previousStation)}</span>
+                  <span className='font-bold text-xs sm:text-sm'>{sName(manifestData.previousStation)}</span>
                 </div>
-                <ArrowRight className="mx-4 h-5 w-5 text-primary shrink-0" />
+                <ArrowRight className="mx-3 sm:mx-4 h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
                 <div className="flex flex-col items-center">
                   <span className="text-[10px] text-muted-foreground uppercase">Hacia</span>
-                  <span className='font-bold text-sm text-primary'>{sName(manifestData.station)}</span>
+                  <span className='font-bold text-xs sm:text-sm text-primary'>{sName(manifestData.station)}</span>
                 </div>
              </div>
              
-             <ScrollArea className="h-72">
+             <ScrollArea className="h-56 sm:h-72">
                 <div className="space-y-6 pr-4">
                     <div className="bg-card border rounded-lg p-3">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5"><PlaneLanding className="text-blue-500 h-4 w-4"/> Desembarcan ({manifestData.dropoffs.length})</h4>

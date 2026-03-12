@@ -1,12 +1,13 @@
 
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { FlightPlan } from '@/lib/types';
-import { User, Milestone, Package, AlertTriangle, Route, Gauge, PlaneTakeoff, ShieldCheck } from 'lucide-react';
+import { User, Package, AlertTriangle, Gauge } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 
 interface FlightPlanCardProps {
@@ -47,88 +48,83 @@ export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCar
   }, [displayedPlan]);
 
   const { metrics } = displayedPlan;
+  const loadPercent = Math.round(metrics.avgLoadRatio * 100);
 
   return (
     <Card 
       className={cn(
         "flex h-full flex-col transition-all cursor-pointer overflow-hidden border shadow-sm relative group", 
-        isSelected ? 'border-primary ring-1 ring-primary shadow-md bg-primary/[0.02]' : 'hover:border-primary/50 hover:bg-muted/20'
+        isSelected ? 'border-primary ring-2 ring-primary/30 shadow-lg bg-primary/[0.02]' : 'hover:border-primary/50 hover:shadow-md hover:bg-muted/10'
       )} 
       onClick={handleSelection}
     >
       {isSelected && (
-        <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-primary/80 to-primary"></div>
       )}
-      <CardHeader className="pb-4">
-        <div className='flex items-start justify-between gap-4'>
-            <div className='flex-1'>
-              <div className="flex items-center gap-2 mb-1.5">
-                <CardTitle className='text-lg font-bold leading-tight'>{displayedPlan.title.split(':')[0]}</CardTitle>
-                {isSelected && <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">Activo</Badge>}
-              </div>
-              <div className="text-sm font-medium text-primary/80 mb-2">{displayedPlan.title.split(':')?.[1]?.trim() || ''}</div>
-              {displayedPlan.description && <CardDescription className='text-xs leading-relaxed line-clamp-2'>{displayedPlan.description}</CardDescription>}
-              <div className="flex items-center gap-1.5 mt-2">
-                <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                <span className="text-[10px] text-muted-foreground">PAX y Carga en vuelos separados</span>
-              </div>
-            </div>
+      <CardHeader className="pb-2 pt-4 sm:pt-5 px-4 sm:px-5">
+        <div className='flex items-center gap-2 sm:gap-3 flex-wrap'>
+            <CardTitle className='text-base sm:text-lg font-bold leading-tight'>{displayedPlan.title}</CardTitle>
+            <Badge variant="outline" className={cn("text-xs px-2.5 py-0.5", shift === 'M' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30' : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30')}>
+              {shift === 'M' ? '☀ Mañana' : '🌙 Tarde'}
+            </Badge>
+            {isSelected && <Badge className="text-xs px-2.5 py-0.5 bg-primary/90">Activo</Badge>}
         </div>
       </CardHeader>
       
       {hasContent ? (
-        <CardContent className="flex-1 flex flex-col justify-end pt-0">
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-background rounded-md border p-2.5 flex flex-col justify-between">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider flex items-center gap-1"><Route className="h-3 w-3" /> Distancia</span>
-              <div className="text-lg font-semibold mt-1">{(metrics.totalDistance).toFixed(1)} <span className="text-xs text-muted-foreground font-normal">ud</span></div>
+        <CardContent className="flex-1 flex flex-col justify-end pt-0 px-4 sm:px-5 pb-4 sm:pb-5">
+          {/* Key metrics row */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+            <div className="bg-background rounded-lg border p-2 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold tabular-nums leading-tight">{metrics.totalDistance.toFixed(0)}</div>
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Tramos</span>
             </div>
-            <div className="bg-background rounded-md border p-2.5 flex flex-col justify-between">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider flex items-center gap-1"><PlaneTakeoff className="h-3 w-3" /> Vuelos</span>
-              <div className="text-lg font-semibold mt-1">{metrics.totalFlights} <span className="text-xs text-muted-foreground font-normal">rt</span></div>
+            <div className="bg-background rounded-lg border p-2 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold tabular-nums leading-tight">{metrics.totalFlights}</div>
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Vuelos</span>
             </div>
-          </div>
-
-          <div className="space-y-2 mb-4">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center text-muted-foreground"><Milestone className="mr-1.5 h-3.5 w-3.5" /> Paradas Totales</span>
-              <span className="font-medium">{metrics.totalStops}</span>
-            </div>
-            
-            {(paxDeliveredCount > 0 || cargoDeliveredCount > 0) && (
-              <div className="flex items-center justify-between text-xs border-t pt-2">
-                <span className="text-muted-foreground">Entregas</span>
-                <div className="flex items-center gap-2">
-                  {paxDeliveredCount > 0 && <span className="font-medium flex items-center"><User className="mr-1 h-3.5 w-3.5 text-blue-500" /> {paxDeliveredCount}</span>}
-                  {cargoDeliveredCount > 0 && <span className="font-medium flex items-center"><Package className="mr-1 h-3.5 w-3.5 text-amber-500" /> {cargoDeliveredCount}</span>}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex items-center justify-between text-xs border-t pt-2">
-              <span className="flex items-center text-muted-foreground"><Gauge className="mr-1.5 h-3.5 w-3.5" /> Carga Promedio</span>
-              <span className="font-medium">{(metrics.avgLoadRatio * 100).toFixed(0)}%</span>
+            <div className="bg-background rounded-lg border p-2 sm:p-3 text-center">
+              <div className="text-xl sm:text-2xl font-bold tabular-nums leading-tight">{metrics.totalStops}</div>
+              <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Paradas</span>
             </div>
           </div>
 
+          {/* Compact info row: deliveries + load */}
+          <div className="flex items-center justify-between text-xs sm:text-sm mb-3 sm:mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {paxDeliveredCount > 0 && (
+                <span className="flex items-center gap-1.5 font-medium text-blue-700 dark:text-blue-300"><User className="h-4 w-4" /> {paxDeliveredCount} PAX</span>
+              )}
+              {cargoDeliveredCount > 0 && (
+                <span className="flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-300"><Package className="h-4 w-4" /> {cargoDeliveredCount} Carga</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Gauge className="h-4 w-4" />
+              <span className={cn("font-bold text-base tabular-nums", loadPercent >= 70 ? 'text-emerald-600 dark:text-emerald-400' : loadPercent >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>{loadPercent}%</span>
+              <Progress value={loadPercent} className="h-2 w-20" />
+            </div>
+          </div>
+
+          {/* Delivery status */}
           {metrics.itemsNotDelivered > 0 ? (
-            <div className="mt-auto bg-destructive/10 text-destructive text-xs font-semibold p-2 rounded-md flex items-center justify-center gap-1.5 border border-destructive/20">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              {metrics.itemsNotDelivered} ITEM(S) NO ENTREGADOS
+            <div className="bg-destructive/10 text-destructive text-sm font-bold p-3 rounded-lg flex items-center justify-center gap-2 border border-destructive/20">
+              <AlertTriangle className="h-4 w-4" />
+              {metrics.itemsNotDelivered} NO ENTREGADO(S)
             </div>
           ) : (
-            <div className="mt-auto bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold p-2 rounded-md flex items-center justify-center gap-1.5 border border-emerald-500/20">
-              ENTREGA COMPLETA (100%)
+            <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-bold p-3 rounded-lg flex items-center justify-center gap-1.5 border border-emerald-500/20">
+              ✓ ENTREGA COMPLETA
             </div>
           )}
         </CardContent>
       ) : (
-        <CardContent className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="h-12 w-12 bg-muted rounded-full flex items-center justify-center mb-3">
-              <AlertTriangle className='h-6 w-6 text-muted-foreground/60' />
+        <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <div className="h-14 w-14 bg-muted rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className='h-7 w-7 text-muted-foreground/60' />
             </div>
-            <p className='font-semibold text-sm'>Sin datos operativos</p>
-            <p className='text-xs text-muted-foreground mt-1 max-w-[180px]'>No hay requerimientos programados para este turno.</p>
+            <p className='font-semibold text-base'>Sin datos operativos</p>
+            <p className='text-sm text-muted-foreground mt-1.5 max-w-[220px]'>No hay requerimientos programados para este turno.</p>
         </CardContent>
       )}
     </Card>

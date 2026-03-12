@@ -36,7 +36,7 @@ const TOUR_STEPS: TourStep[] = [
       <div className="bg-card border rounded-lg p-3 text-xs space-y-2 w-full">
         <div className="flex items-center gap-2 font-semibold"><Users className="h-3.5 w-3.5 text-blue-500" /> PAX — Tipo: Pasajero</div>
         <div className="flex items-center gap-2 font-semibold"><Package className="h-3.5 w-3.5 text-amber-500" /> CARGO — Tipo: Carga</div>
-        <div className="text-muted-foreground">Cada ítem necesita: área, tipo, turno (M/T), prioridad (1-5), estación origen y destino.</div>
+        <div className="text-muted-foreground">Cada ítem necesita: área, tipo, turno (M/T), prioridad (1-3), estación origen y destino.</div>
       </div>
     ),
     tip: 'Puedes agregar múltiples ítems manualmente o importar un Excel.',
@@ -62,17 +62,15 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: 'Calcular Planes de Vuelo',
     description:
-      'Una vez definidos los requerimientos, presiona "Calcular Plan Operativo" en el panel lateral. El motor heurístico generará 4 estrategias de optimización distintas para cada turno (Mañana y Tarde):',
+      'Una vez definidos los requerimientos, presiona "Calcular Plan Operativo" en el panel lateral. El algoritmo generará un plan optimizado para cada turno (Mañana y Tarde), respetando prioridades y separando PAX de CARGO.',
     icon: <Sparkles className="h-8 w-8" />,
     visual: (
-      <div className="grid grid-cols-2 gap-2 w-full text-xs">
-        <div className="bg-card border rounded-md p-2"><span className="font-bold text-primary">Plan A:</span> Prioridad Estricta</div>
-        <div className="bg-card border rounded-md p-2"><span className="font-bold text-primary">Plan B:</span> Ruta Más Corta</div>
-        <div className="bg-card border rounded-md p-2"><span className="font-bold text-primary">Plan C:</span> Máxima Carga</div>
-        <div className="bg-card border rounded-md p-2"><span className="font-bold text-primary">Plan D:</span> Balanceado</div>
+      <div className="bg-card border rounded-lg p-3 text-xs space-y-1.5 w-full">
+        <div className="font-semibold text-primary">Plan Optimizado</div>
+        <div className="text-muted-foreground">Prioridad P1→P2→P3 · PAX y Carga separados · Partida desde Base</div>
       </div>
     ),
-    tip: 'Cada plan muestra distancia total, vuelos, paradas, entregas PAX/CARGO y carga promedio.',
+    tip: 'El plan muestra distancia total, vuelos, paradas, entregas PAX/CARGO y carga promedio.',
   },
   {
     title: 'Selector de Turno',
@@ -92,7 +90,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: 'Vista: Análisis de Rutas',
     description:
-      'La vista principal muestra las tarjetas de cada estrategia con sus métricas. Haz clic en una tarjeta para seleccionar ese plan y poder verlo en las demás vistas. Debajo encontrarás gráficos comparativos de barras y radar.',
+      'La vista principal muestra la tarjeta del plan optimizado con sus métricas. Desde aquí puedes revisar el detalle del plan en las demás vistas.',
     icon: <ListCollapse className="h-8 w-8" />,
     visual: (
       <div className="flex items-center gap-3 w-full justify-center">
@@ -107,7 +105,7 @@ const TOUR_STEPS: TourStep[] = [
         </div>
       </div>
     ),
-    tip: 'Compara métricas entre estrategias con los gráficos de barras y radar al final.',
+    tip: 'Revisa las métricas del plan optimizado para cada turno.',
   },
   {
     title: 'Vista: Desglose en Tabla',

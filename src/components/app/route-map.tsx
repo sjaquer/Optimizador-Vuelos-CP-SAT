@@ -16,11 +16,13 @@ interface RouteMapProps {
   onStepChange: (step: number) => void;
 }
 
-const getLegColor = (items: { type: string }[]): string => {
-  if (items.length === 0) return 'stroke-muted-foreground';
-  const hasPax = items.some(i => i.type === 'PAX');
-  const hasCargo = items.some(i => i.type === 'CARGO');
-  if (hasPax && hasCargo) return 'stroke-violet-500';
+const getLegColor = (step: { legType?: string; items: { type: string }[] }): string => {
+  if (step.legType === 'PAX') return 'stroke-blue-500';
+  if (step.legType === 'CARGO') return 'stroke-amber-500';
+  if (step.legType === 'EMPTY') return 'stroke-muted-foreground';
+  // Fallback based on items
+  if (step.items.length === 0) return 'stroke-muted-foreground';
+  const hasPax = step.items.some(i => i.type === 'PAX');
   if (hasPax) return 'stroke-blue-500';
   return 'stroke-amber-500';
 };
@@ -127,12 +129,16 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
   return (
     <Card className="flex flex-col shadow-sm border border-border/70 overflow-hidden">
       <CardContent className="flex-1 flex flex-col items-center p-0 m-0">
-        <div className="relative w-full aspect-[4/3] bg-background">
-          {/* Grid background */}
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-          <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)', backgroundSize: '120px 120px' }}></div>
+        <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-br from-emerald-950/20 via-emerald-900/10 to-emerald-950/20 dark:from-emerald-950/40 dark:via-emerald-900/20 dark:to-emerald-950/40 overflow-hidden">
+          {/* Terrain-like background layers */}
+          <div className="absolute inset-0 opacity-[0.06] dark:opacity-[0.08] pointer-events-none" style={{ backgroundImage: 'radial-gradient(ellipse at 30% 50%, rgba(34,197,94,0.4) 0%, transparent 60%), radial-gradient(ellipse at 70% 30%, rgba(34,197,94,0.3) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(34,197,94,0.2) 0%, transparent 50%)' }}></div>
+          {/* Contour lines */}
+          <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'repeating-radial-gradient(ellipse at 35% 45%, transparent 0%, transparent 40px, rgba(34,197,94,0.3) 40px, rgba(34,197,94,0.3) 41px, transparent 41px)', backgroundSize: '100% 100%' }}></div>
+          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'repeating-radial-gradient(ellipse at 65% 55%, transparent 0%, transparent 50px, rgba(34,197,94,0.2) 50px, rgba(34,197,94,0.2) 51px, transparent 51px)', backgroundSize: '100% 100%' }}></div>
+          {/* Grid overlay */}
+          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)', backgroundSize: '100px 100px' }}></div>
           
-          <svg viewBox="0 0 800 600" className="relative z-10 w-full h-full overflow-visible p-4">
+          <svg viewBox="0 0 850 500" className="relative z-10 w-full h-full overflow-visible p-2 sm:p-4" preserveAspectRatio="xMidYMid meet">
             <defs>
               <marker id="arrowhead-blue" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto">
                 <polygon points="0 0, 8 3, 0 6" className="fill-blue-500" />
@@ -167,9 +173,9 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
               const start = stationCoordsMap[startId];
               const end = stationCoordsMap[leg.station];
               if (!start || !end) return null;
-              const colorClass = index === currentStep ? getLegColor(leg.items) : 'stroke-muted-foreground/30';
-              const arrowId = leg.items.some(i => i.type === 'PAX') ? 'arrowhead-blue'
-                : leg.items.some(i => i.type === 'CARGO') ? 'arrowhead-amber' : 'arrowhead-muted';
+              const colorClass = index === currentStep ? getLegColor(leg) : 'stroke-muted-foreground/30';
+              const arrowId = leg.legType === 'PAX' || leg.items.some(i => i.type === 'PAX') ? 'arrowhead-blue'
+                : leg.legType === 'CARGO' || leg.items.some(i => i.type === 'CARGO') ? 'arrowhead-amber' : 'arrowhead-muted';
               return (
                 <line key={`active-${index}`}
                   x1={start.x} y1={start.y} x2={end.x} y2={end.y}
@@ -201,30 +207,37 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
                 >
                   {/* Activity ring */}
                   {(hasPickup || hasDropoff) && (
-                    <circle cx="0" cy="0" r="18" fill="none"
+                    <circle cx="0" cy="0" r="22" fill="none"
                       className={hasPickup && hasDropoff ? 'stroke-primary/30' : hasPickup ? 'stroke-emerald-500/30' : 'stroke-blue-500/30'}
                       strokeWidth="2" strokeDasharray="4 2"
                     />
                   )}
                   
                   {/* Pulse ring for current station */}
-                  {isCurrent && <circle cx="0" cy="0" r="16" className="fill-primary/20 animate-station-pulse" />}
+                  {isCurrent && <circle cx="0" cy="0" r="20" className="fill-primary/20 animate-station-pulse" />}
+                  
+                  {/* Shadow under station */}
+                  <circle cx="1" cy="2" r={isBase ? 16 : 12} className="fill-black/10 dark:fill-black/20" />
                   
                   {/* Station circle */}
-                  <circle cx="0" cy="0" r={isBase ? 14 : 10}
+                  <circle cx="0" cy="0" r={isBase ? 16 : 12}
                     className={isBase ? 'fill-primary stroke-primary/50' : isCurrent ? 'fill-primary stroke-primary-foreground' : 'fill-card stroke-border'}
-                    strokeWidth="2"
+                    strokeWidth="2.5"
                   />
-                  <text x="0" y="1" textAnchor="middle" dy="0.3em"
+                  <text x="0" y="1" textAnchor="middle" dy="0.35em"
                     className={isBase || isCurrent ? 'fill-primary-foreground font-bold' : 'fill-foreground font-semibold'}
-                    fontSize={isBase ? 10 : 9}
+                    fontSize={isBase ? 11 : 10}
                   >
                     {isBase ? 'BO' : station.id}
                   </text>
                   
-                  {/* Station name label (always visible) */}
-                  <text x="0" y={isBase ? 24 : 20} textAnchor="middle" fontSize="9"
-                    className="fill-muted-foreground font-medium"
+                  {/* Station name label with background */}
+                  <rect x={-40} y={isBase ? 24 : 20} width={80} height={16} rx={4}
+                    className="fill-card/80 dark:fill-card/60 stroke-border/40"
+                    strokeWidth="0.5"
+                  />
+                  <text x="0" y={isBase ? 35 : 31} textAnchor="middle" fontSize="10"
+                    className="fill-foreground font-semibold"
                   >
                     {station.name.replace('HP ', '').replace('BO ', '')}
                   </text>
@@ -260,7 +273,7 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
 
         {/* Current leg info bar */}
         {currentLegInfo && (
-          <div className="w-full bg-muted/30 border-t px-4 py-2.5 flex items-center gap-4 text-sm">
+          <div className="w-full bg-muted/30 border-t px-3 sm:px-4 py-2 sm:py-2.5 flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-4 text-xs sm:text-sm">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="font-semibold text-foreground truncate">{currentLegInfo.from}</span>
               <span className="text-muted-foreground">→</span>
@@ -286,40 +299,41 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
 
         {/* Controls */}
         {flightPath.length > 0 && (
-          <div className="w-full space-y-3 p-4 bg-card border-t z-10 relative">
-            <div className="max-w-2xl mx-auto flex justify-between items-center bg-muted/40 p-2 rounded-lg border">
-              <h4 className="font-semibold text-sm px-2 text-muted-foreground uppercase tracking-wide">Tramo {currentStep + 1} / {flightPath.length}</h4>
+          <div className="w-full space-y-2 p-3 sm:p-4 bg-card border-t z-10 relative">
+            <div className="max-w-2xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 bg-muted/40 p-2 rounded-lg border">
+              <h4 className="font-semibold text-xs sm:text-sm px-2 text-muted-foreground uppercase tracking-wide">Tramo {currentStep + 1} / {flightPath.length}</h4>
               <div className="flex gap-1.5">
-                <Button variant="outline" size="sm" className="h-8 shadow-sm" onClick={() => { onStepChange(0); setIsPlaying(false); }}>
-                  <SkipBack className="h-4 w-4 mr-1" /> Inicio
+                <Button variant="outline" size="sm" className="h-9 sm:h-8 px-3 shadow-sm text-xs" onClick={() => { onStepChange(0); setIsPlaying(false); }}>
+                  <SkipBack className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Inicio</span>
                 </Button>
-                <div className="w-px h-8 bg-border mx-1" />
-                <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onStepChange(Math.max(0, currentStep - 1))} disabled={currentStep === 0}>
+                <div className="w-px h-9 sm:h-8 bg-border mx-0.5" />
+                <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shadow-sm" onClick={() => onStepChange(Math.max(0, currentStep - 1))} disabled={currentStep === 0}>
                   <SkipForward className="h-4 w-4 rotate-180" />
                 </Button>
-                <Button variant={isPlaying ? 'default' : 'secondary'} size="icon" className="h-8 w-8 shadow-sm border-primary/20" onClick={togglePlay}>
+                <Button variant={isPlaying ? 'default' : 'secondary'} size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shadow-sm border-primary/20" onClick={togglePlay}>
                   {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
                 </Button>
-                <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onStepChange(Math.min(flightPath.length - 1, currentStep + 1))} disabled={currentStep >= flightPath.length - 1}>
+                <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shadow-sm" onClick={() => onStepChange(Math.min(flightPath.length - 1, currentStep + 1))} disabled={currentStep >= flightPath.length - 1}>
                   <SkipForward className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             
-            <div className="px-4 max-w-2xl mx-auto">
+            <div className="px-2 sm:px-4 max-w-2xl mx-auto">
               <Slider
                 value={[currentStep]}
                 onValueChange={(value) => { onStepChange(value[0]); setIsPlaying(false); }}
                 max={flightPath.length - 1}
                 step={1}
-                className="cursor-pointer py-2"
+                className="cursor-pointer py-3"
               />
             </div>
 
-            <div className="flex items-center gap-6 text-[10px] uppercase font-bold text-muted-foreground justify-center pt-1">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-blue-500 rounded-full" /> Vuelo PAX</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-amber-500 rounded-full" /> Vuelo Carga</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-muted-foreground rounded-full" style={{ borderTop: '1px dashed' }} /> Ruta planificada</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] uppercase font-bold text-muted-foreground justify-center">
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-blue-500 rounded-full" /> PAX</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-amber-500 rounded-full" /> Carga</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-muted-foreground rounded-full" /> Vacío</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-muted-foreground/30 rounded-full" style={{ borderTop: '1px dashed' }} /> Planificada</span>
             </div>
           </div>
         )}

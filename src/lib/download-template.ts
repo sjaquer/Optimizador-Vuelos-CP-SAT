@@ -109,7 +109,7 @@ export async function downloadTemplate() {
     '• "area": Nombre del área o departamento solicitante.',
     '• "tipo": Escribir PAX (pasajeros) o CARGO (carga). No se mezclan en un mismo vuelo.',
     '• "turno": M = Mañana, T = Tarde. Los turnos no se mezclan.',
-    '• "prioridad": 1 (más urgente) a 5 (menos urgente).',
+    '• "prioridad": 1 (Máxima urgencia), 2 (Programación estándar), 3 (Baja prioridad).',
     '• "cantidad": Solo para PAX, indicar número de personas.',
     '• "origen" / "destino": ID de estación (ver hoja Configuracion). 0 = Base.',
     '• "peso": Solo para CARGO, peso en kg. PAX usa peso estándar configurado.',
@@ -135,7 +135,7 @@ export async function downloadTemplate() {
   });
   wsItemsAny.dataValidations.add('D2:D200', {
     type: 'whole', allowBlank: false, operator: 'between',
-    formulae: [1, 5], showErrorMessage: true, errorTitle: 'Prioridad', error: 'Valor entre 1 y 5.',
+    formulae: [1, 3], showErrorMessage: true, errorTitle: 'Prioridad', error: 'Valor entre 1 y 3 (1=Urgente, 2=Estándar, 3=Baja).',
   });
 
   wsItems.views = [{ state: 'frozen', ySplit: 1 }];
