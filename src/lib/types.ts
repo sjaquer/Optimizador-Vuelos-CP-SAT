@@ -4,7 +4,7 @@ export interface TransportItem {
   area: string;
   type: 'PAX' | 'CARGO';
   shift: 'M' | 'T'; // Mañana o Tarde
-  priority: number;
+  priority: 1 | 2 | 3; // 1=Máxima urgencia, 2=Programación estándar, 3=Baja prioridad
   quantity: number;
   originStation: number;
   destinationStation: number;
@@ -17,6 +17,7 @@ export interface FlightStep {
   station: number;
   items: TransportItem[];
   notes: string;
+  legType?: 'PAX' | 'CARGO' | 'EMPTY'; // Tipo de tramo para diferenciación visual
 }
 
 export interface FlightPlan {

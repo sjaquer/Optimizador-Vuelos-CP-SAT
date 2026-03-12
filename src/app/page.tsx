@@ -31,9 +31,8 @@ import {
 } from "@/components/ui/select";
 import { StationLegend } from '@/components/app/station-legend';
 import { FlightManifest } from '@/components/app/flight-manifest';
-import { runFlightSimulation } from '@/lib/optimizer';
+import { runFlightOptimization } from '@/lib/optimizer';
 import { FlightItinerary } from '@/components/app/flight-itinerary';
-import { PlanComparisonChart } from '@/components/app/plan-comparison-chart';
 
 
 export default function Home() {
@@ -80,13 +79,10 @@ export default function Home() {
     return calculatedPlans[selectedPlanId] || null;
   }, [selectedPlanId, calculatedPlans]);
 
-  const plansForActiveShift = useMemo(() => {
-    return basePlans.map(p => {
-        const shiftId = `${p.id}_${activeShift}`;
-        return calculatedPlans[shiftId] || { ...p, id: shiftId, steps: [] }; // Return calculated if exists, else a template
-    });
-  }, [basePlans, calculatedPlans, activeShift]);
-  
+  const planForActiveShift = useMemo(() => {
+    const shiftId = `optimized_${activeShift}`;
+    return calculatedPlans[shiftId] || null;
+  }, [calculatedPlans, activeShift]);
 
   const handleGeneratePlans = () => {
     if (scenario.transportItems.length === 0) {
@@ -98,49 +94,44 @@ export default function Home() {
         return;
     }
     setIsLoading(true);
-    setBasePlans([]);
     setCalculatedPlans({});
     setSelectedPlanId(null);
     setActiveView('plans');
     setActiveShift('M');
 
-    // Timeout to allow UI to update to loading state
     setTimeout(() => {
       try {
-        const initialPlans: FlightPlan[] = [
-            { id: 'strict_priority', title: 'Plan A: Prioridad Estricta', description: 'Atiende primero los requerimientos de mayor prioridad (P1 antes que P2, etc.). PAX y CARGO van en vuelos separados. El tipo con el ítem más urgente vuela primero.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-            { id: 'shortest_route', title: 'Plan B: Ruta Más Corta', description: 'Minimiza la distancia total con optimización 2-opt. Recoge en la estación más cercana y entrega en ruta. Vuelos exclusivos PAX o CARGO.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-            { id: 'max_load', title: 'Plan C: Máxima Carga', description: 'Maximiza la ocupación en cada vuelo para reducir el número total de viajes. Prioriza estaciones con más ítems por recoger. Separa PAX de CARGO.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-            { id: 'balanced', title: 'Plan D: Balanceado', description: 'Equilibra prioridad y eficiencia de ruta. Combina puntaje de urgencia con distancia para elegir la siguiente estación. Vuelos exclusivos por tipo.', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } },
-        ];
-        
-        setBasePlans(initialPlans);
-
         const newCalculatedPlans: Record<string, FlightPlan> = {};
         const shifts: ('M' | 'T')[] = ['M', 'T'];
 
-        for (const planTemplate of initialPlans) {
-            for (const shift of shifts) {
-                const itemsForShift = scenario.transportItems.filter(item => item.shift === shift);
-                const calculated = runFlightSimulation(planTemplate, itemsForShift, scenario, shift);
-                newCalculatedPlans[calculated.id] = calculated;
-            }
+        for (const shift of shifts) {
+            const itemsForShift = scenario.transportItems.filter(item => item.shift === shift);
+            const calculated = runFlightOptimization(itemsForShift, scenario, shift);
+            newCalculatedPlans[calculated.id] = calculated;
         }
         
+        setBasePlans([{ id: 'optimized', title: 'Plan Óptimo', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } }]);
         setCalculatedPlans(newCalculatedPlans);
+        
+        // Auto-select the morning plan
+        const morningPlan = newCalculatedPlans['optimized_M'];
+        if (morningPlan && morningPlan.steps.length > 0) {
+          setSelectedPlanId('optimized_M');
+        }
+        
         saveScenarioToHistory(scenario, newCalculatedPlans);
         
         toast({
             title: 'Éxito',
-            description: 'Planes para Mañana y Tarde calculados.',
+            description: 'Planes optimizados para Mañana y Tarde calculados.',
           });
           
       } catch (error) {
         console.error("Error setting up plans:", error);
         toast({
           variant: 'destructive',
-          title: 'Error de Configuración',
-          description: error instanceof Error ? error.message : 'No se pudo preparar el escenario.',
+          title: 'Error de Optimización',
+          description: error instanceof Error ? error.message : 'No se pudo calcular el plan operativo.',
         });
       } finally {
          setIsLoading(false);
@@ -220,6 +211,8 @@ export default function Home() {
             if (!item.turno) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'turno'.`);
             if (item.turno !== 'M' && item.turno !== 'T') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'turno' debe ser 'M' o 'T'.`);
             if (item.prioridad === undefined || item.prioridad.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'prioridad'.`);
+            const prio = Number(item.prioridad);
+            if (prio < 1 || prio > 3) throw new Error(`Error en la fila ${rowIndex} de 'Items': La prioridad debe ser 1, 2 o 3.`);
             if (item.origen === undefined || item.origen.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'origen'.`);
             if (item.destino === undefined || item.destino.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'destino'.`);
             
@@ -236,7 +229,7 @@ export default function Home() {
               area: item.area,
               type: item.tipo,
               shift: item.turno,
-              priority: Number(item.prioridad),
+              priority: prio as 1 | 2 | 3,
               quantity: item.tipo === 'PAX' ? Number(item.cantidad) : 1,
               originStation: Number(item.origen),
               destinationStation: Number(item.destino),
@@ -283,43 +276,26 @@ export default function Home() {
   
   const handleShiftChange = (shift: 'M' | 'T') => {
     setActiveShift(shift);
-    const currentBaseId = selectedPlanId?.split('_').slice(0, -1).join('_');
-
-    if (activeView !== 'plans' && currentBaseId) {
-        const newPlanId = `${currentBaseId}_${shift}`;
-        if (calculatedPlans[newPlanId] && calculatedPlans[newPlanId].steps.length > 0) {
-            setSelectedPlanId(newPlanId);
-        } else {
-             // Try to select the first available plan for the new shift
-             const firstAvailablePlan = basePlans
-                .map(p => `${p.id}_${shift}`)
-                .find(id => calculatedPlans[id] && calculatedPlans[id].steps.length > 0);
-            
-            if (firstAvailablePlan) {
-                setSelectedPlanId(firstAvailablePlan);
-            } else {
-                setSelectedPlanId(null);
-                setActiveView('plans'); // No plans for this shift, go back to plans view
-            }
-        }
+    const newPlanId = `optimized_${shift}`;
+    if (calculatedPlans[newPlanId] && calculatedPlans[newPlanId].steps.length > 0) {
+      setSelectedPlanId(newPlanId);
     } else {
-        setSelectedPlanId(null);
-        if (activeView !== 'plans') {
-            setActiveView('plans');
-        }
+      setSelectedPlanId(null);
+      if (activeView !== 'plans') {
+        setActiveView('plans');
+      }
     }
   }
 
   const handleViewChange = (view: 'plans' | 'map' | 'itinerary') => {
     if (view !== 'plans' && !selectedPlanId) {
-       const firstAvailablePlan = plansForActiveShift.find(p => p.steps.length > 0);
-       if (firstAvailablePlan) {
-         setSelectedPlanId(firstAvailablePlan.id);
+       if (planForActiveShift && planForActiveShift.steps.length > 0) {
+         setSelectedPlanId(planForActiveShift.id);
          setActiveView(view);
        } else {
          toast({
             variant: 'destructive',
-            title: 'No hay plan seleccionado',
+            title: 'No hay plan disponible',
             description: 'No hay planes con rutas para mostrar en esta vista.',
          })
        }
@@ -400,7 +376,7 @@ export default function Home() {
                     <div className="flex items-center gap-1 rounded-md bg-muted/50 p-1 border">
                       <Button variant={activeView === 'plans' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('plans')} className="h-9 px-4 transition-all">
                         <ListCollapse className="mr-2 h-4 w-4" />
-                        Análisis de Rutas
+                        Resumen del Plan
                       </Button>
                        <Button variant={activeView === 'itinerary' ? 'default' : 'ghost'} size="sm" onClick={() => handleViewChange('itinerary')} className="h-9 px-4 transition-all" disabled={!selectedPlan || selectedPlan.steps.length === 0}>
                         <Milestone className="mr-2 h-4 w-4" />
@@ -418,7 +394,7 @@ export default function Home() {
                     <div>
                       <h2 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2 text-foreground">
                         <Wind className="text-primary h-5 w-5" /> 
-                        Estrategias de Vuelo Calculadas
+                        Plan Operativo Optimizado
                         <span className="ml-2 text-sm font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full border">
                           Turno {activeShift === 'M' ? 'Mañana' : 'Tarde'}
                         </span>
@@ -481,25 +457,28 @@ export default function Home() {
                         <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
                         <span className="text-muted-foreground">
                           <strong className="text-foreground">Reglas activas:</strong> Pasajeros y Carga viajan en vuelos 100% separados.
-                          Turnos Mañana/Tarde no se mezclan. Prioridad 1 = más urgente.
+                          Turnos Mañana/Tarde no se mezclan. Prioridad: P1=Urgente, P2=Estándar, P3=Baja. Origen obligatorio: Base (BO Nuevo Mundo).
                         </span>
                         <div className="flex items-center gap-3 ml-auto shrink-0">
                           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-blue-500" /> PAX: {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'PAX').length}</span>
                           <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-amber-500" /> Carga: {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'CARGO').length}</span>
                         </div>
                       </div>
-                      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                        {plansForActiveShift.map((plan) => (
+                      <div className="max-w-2xl mx-auto">
+                        {planForActiveShift && (
                           <FlightPlanCard 
-                            key={plan.id} 
-                            plan={plan}
+                            plan={planForActiveShift}
                             onSelectPlan={handlePlanSelection}
-                            isSelected={selectedPlanId === plan.id}
+                            isSelected={selectedPlanId === planForActiveShift.id}
                           />
-                        ))}
+                        )}
+                        {!planForActiveShift && (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <p className="text-sm">No hay plan calculado para este turno.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <PlanComparisonChart plans={plansForActiveShift} />
                   </div>
                 )}
                 
@@ -515,20 +494,6 @@ export default function Home() {
                         onStepChange={setCurrentMapStep}
                     />
                     <div className='flex flex-col gap-6'>
-                       <div className='flex items-center gap-4'>
-                         <Select value={selectedPlan.id} onValueChange={(planId) => handlePlanSelection(planId)}>
-                            <SelectTrigger className="w-auto flex-1">
-                              <SelectValue placeholder="Seleccionar un plan" />
-                            </SelectTrigger>
-                            <SelectContent>
-                               {Object.values(calculatedPlans).filter(p => p.steps.length > 0 && p.id.endsWith(activeShift)).map((p) => (
-                                 <SelectItem key={p.id} value={p.id}>
-                                  {p.title}
-                                 </SelectItem>
-                               ))}
-                            </SelectContent>
-                          </Select>
-                      </div>
                       <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
                     </div>
                   </div>

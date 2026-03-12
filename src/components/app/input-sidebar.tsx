@@ -42,7 +42,7 @@ const transportItemSchema = z.object({
   area: z.string().min(1, 'Área requerida'),
   type: z.enum(['PAX', 'CARGO']),
   shift: z.enum(['M', 'T']),
-  priority: z.coerce.number().min(1).max(5),
+  priority: z.coerce.number().min(1).max(3) as unknown as z.ZodType<1 | 2 | 3>,
   quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
   originStation: z.coerce.number().min(0),
   destinationStation: z.coerce.number().min(0),
@@ -308,7 +308,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                             <div className="grid grid-cols-3 gap-2">
                                 <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TIPO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-7 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGA</SelectItem></SelectContent></Select></FormItem> )}/>
                                 <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TRN</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-7 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="M">MAÑ</SelectItem><SelectItem value="T">TAR</SelectItem></SelectContent></Select></FormItem> )}/>
-                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PRIO</FormLabel><FormControl><Input type="number" min="1" max="5" className="h-7 text-xs bg-background" {...field} /></FormControl></FormItem> )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PRIO</FormLabel><Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}><FormControl><SelectTrigger className="h-7 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">P1 - Urgente</SelectItem><SelectItem value="2">P2 - Estándar</SelectItem><SelectItem value="3">P3 - Baja</SelectItem></SelectContent></Select></FormItem> )}/>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-2">
@@ -357,7 +357,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           </div>
                         );
                       })}
-                      <Button type="button" variant="outline" className="w-full" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 3, quantity: 1, originStation: 1, destinationStation: 0, weight: 80, description: '' })}>
+                      <Button type="button" variant="outline" className="w-full" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 2, quantity: 1, originStation: 0, destinationStation: 1, weight: 80, description: '' })}>
                         <Plus className="mr-2" /> Agregar Item
                       </Button>
                     </div>
@@ -482,7 +482,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
         <SidebarFooter className="group-data-[collapsible=icon]:hidden p-4 border-t bg-card/50">
           <Button type="submit" disabled={isLoading} className="w-full h-11 font-bold shadow-md relative overflow-hidden group">
             {isLoading ? (
-              <><Wind className="mr-2 h-5 w-5 animate-spin" /> Procesando Heurística...</>
+              <><Wind className="mr-2 h-5 w-5 animate-spin" /> Optimizando Plan...</>
             ) : (
               <span className="flex items-center justify-center relative z-10 transition-transform group-hover:gap-2">
                  Calcular Plan Operativo <ArrowRight className="ml-2 h-5 w-5 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all" />

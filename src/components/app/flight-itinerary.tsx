@@ -56,7 +56,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
     );
   };
   
-  const strategy = plan.id.split('_').slice(0, -1).join('_');
+  const strategy = plan.id.replace(/_[MT]$/, '');
   const shift = plan.id.endsWith('_M') ? 'M' : 'T';
 
   const exportToPDF = async () => {
@@ -67,7 +67,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
     doc.text(`${plan.title} (Turno ${shift === 'M' ? 'Mañana' : 'Tarde'})`, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
     
     doc.setFontSize(11);
-    const metricsText = `Paradas: ${plan.metrics.totalStops} | Dist: ${plan.metrics.totalDistance.toFixed(1)} ud | Tramos: ${plan.metrics.totalLegs} | Items: ${plan.metrics.itemsTransported} | Vuelos: ${plan.metrics.totalFlights} | Carga prom: ${(plan.metrics.avgLoadRatio * 100).toFixed(0)}%`;
+    const metricsText = `Paradas: ${plan.metrics.totalStops} | Dist: ${plan.metrics.totalDistance.toFixed(0)} tramos | Tramos: ${plan.metrics.totalLegs} | Items: ${plan.metrics.itemsTransported} | Vuelos: ${plan.metrics.totalFlights} | Carga prom: ${(plan.metrics.avgLoadRatio * 100).toFixed(0)}%`;
     doc.text(metricsText, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
     
     autoTable(doc, {

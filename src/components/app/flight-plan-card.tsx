@@ -63,14 +63,16 @@ export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCar
         <div className='flex items-start justify-between gap-4'>
             <div className='flex-1'>
               <div className="flex items-center gap-2 mb-1.5">
-                <CardTitle className='text-lg font-bold leading-tight'>{displayedPlan.title.split(':')[0]}</CardTitle>
+                <CardTitle className='text-lg font-bold leading-tight'>{displayedPlan.title}</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                  {shift === 'M' ? 'Mañana' : 'Tarde'}
+                </Badge>
                 {isSelected && <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">Activo</Badge>}
               </div>
-              <div className="text-sm font-medium text-primary/80 mb-2">{displayedPlan.title.split(':')?.[1]?.trim() || ''}</div>
-              {displayedPlan.description && <CardDescription className='text-xs leading-relaxed line-clamp-2'>{displayedPlan.description}</CardDescription>}
+              {displayedPlan.description && <CardDescription className='text-xs leading-relaxed line-clamp-3'>{displayedPlan.description}</CardDescription>}
               <div className="flex items-center gap-1.5 mt-2">
                 <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                <span className="text-[10px] text-muted-foreground">PAX y Carga en vuelos separados</span>
+                <span className="text-[10px] text-muted-foreground">PAX y Carga en vuelos separados · Prioridad P1→P2→P3</span>
               </div>
             </div>
         </div>
@@ -81,7 +83,7 @@ export function FlightPlanCard({ plan, onSelectPlan, isSelected }: FlightPlanCar
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-background rounded-md border p-2.5 flex flex-col justify-between">
               <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider flex items-center gap-1"><Route className="h-3 w-3" /> Distancia</span>
-              <div className="text-lg font-semibold mt-1">{(metrics.totalDistance).toFixed(1)} <span className="text-xs text-muted-foreground font-normal">ud</span></div>
+              <div className="text-lg font-semibold mt-1">{(metrics.totalDistance).toFixed(0)} <span className="text-xs text-muted-foreground font-normal">tramos</span></div>
             </div>
             <div className="bg-background rounded-md border p-2.5 flex flex-col justify-between">
               <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider flex items-center gap-1"><PlaneTakeoff className="h-3 w-3" /> Vuelos</span>

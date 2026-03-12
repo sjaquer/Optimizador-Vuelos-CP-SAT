@@ -16,11 +16,13 @@ interface RouteMapProps {
   onStepChange: (step: number) => void;
 }
 
-const getLegColor = (items: { type: string }[]): string => {
-  if (items.length === 0) return 'stroke-muted-foreground';
-  const hasPax = items.some(i => i.type === 'PAX');
-  const hasCargo = items.some(i => i.type === 'CARGO');
-  if (hasPax && hasCargo) return 'stroke-violet-500';
+const getLegColor = (step: { legType?: string; items: { type: string }[] }): string => {
+  if (step.legType === 'PAX') return 'stroke-blue-500';
+  if (step.legType === 'CARGO') return 'stroke-amber-500';
+  if (step.legType === 'EMPTY') return 'stroke-muted-foreground';
+  // Fallback based on items
+  if (step.items.length === 0) return 'stroke-muted-foreground';
+  const hasPax = step.items.some(i => i.type === 'PAX');
   if (hasPax) return 'stroke-blue-500';
   return 'stroke-amber-500';
 };
@@ -132,7 +134,7 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
           <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)', backgroundSize: '120px 120px' }}></div>
           
-          <svg viewBox="0 0 800 600" className="relative z-10 w-full h-full overflow-visible p-4">
+          <svg viewBox="0 0 850 500" className="relative z-10 w-full h-full overflow-visible p-4">
             <defs>
               <marker id="arrowhead-blue" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto">
                 <polygon points="0 0, 8 3, 0 6" className="fill-blue-500" />
@@ -167,9 +169,9 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
               const start = stationCoordsMap[startId];
               const end = stationCoordsMap[leg.station];
               if (!start || !end) return null;
-              const colorClass = index === currentStep ? getLegColor(leg.items) : 'stroke-muted-foreground/30';
-              const arrowId = leg.items.some(i => i.type === 'PAX') ? 'arrowhead-blue'
-                : leg.items.some(i => i.type === 'CARGO') ? 'arrowhead-amber' : 'arrowhead-muted';
+              const colorClass = index === currentStep ? getLegColor(leg) : 'stroke-muted-foreground/30';
+              const arrowId = leg.legType === 'PAX' || leg.items.some(i => i.type === 'PAX') ? 'arrowhead-blue'
+                : leg.legType === 'CARGO' || leg.items.some(i => i.type === 'CARGO') ? 'arrowhead-amber' : 'arrowhead-muted';
               return (
                 <line key={`active-${index}`}
                   x1={start.x} y1={start.y} x2={end.x} y2={end.y}
@@ -317,9 +319,10 @@ export function RouteMap({ plan, numStations, currentStep, onStepChange }: Route
             </div>
 
             <div className="flex items-center gap-6 text-[10px] uppercase font-bold text-muted-foreground justify-center pt-1">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-blue-500 rounded-full" /> Vuelo PAX</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-amber-500 rounded-full" /> Vuelo Carga</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-muted-foreground rounded-full" style={{ borderTop: '1px dashed' }} /> Ruta planificada</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-blue-500 rounded-full" /> Tramo PAX</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-amber-500 rounded-full" /> Tramo Carga</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-muted-foreground rounded-full" /> Vacío / Reposición</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-muted-foreground/30 rounded-full" style={{ borderTop: '1px dashed' }} /> Ruta planificada</span>
             </div>
           </div>
         )}
