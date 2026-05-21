@@ -77,8 +77,33 @@ export default function Home() {
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backgroundObjectUrlRef = useRef<string | null>(null);
   const { toast } = useToast();
   const onboarding = useOnboarding();
+
+  useEffect(() => {
+    return () => {
+      if (backgroundObjectUrlRef.current) {
+        try { URL.revokeObjectURL(backgroundObjectUrlRef.current); } catch (e) { /* ignore */ }
+        backgroundObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleBackgroundFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Revoke previous blob URL if any
+    if (backgroundObjectUrlRef.current) {
+      try { URL.revokeObjectURL(backgroundObjectUrlRef.current); } catch (err) { /* ignore */ }
+    }
+    const url = URL.createObjectURL(file);
+    backgroundObjectUrlRef.current = url;
+    setScenario(prev => ({ ...prev, mapBackgroundUrl: url }));
+    // clear the input so selecting same file again triggers change
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    toast({ title: 'Imagen cargada', description: 'La imagen de fondo se ha establecido correctamente.' });
+  };
 
   // Build namesMap from current scenario stations
   const namesMap = useMemo(() => buildNamesMap(scenario.stations), [scenario.stations]);
@@ -587,10 +612,7 @@ export default function Home() {
                           mapBackgroundUrl={scenario.mapBackgroundUrl}
                           onStationDrag={handleStationDrag}
                           onBackgroundUpload={() => {
-                            const url = prompt("Introduce la URL de la imagen de fondo para el mapa:");
-                            if (url !== null) {
-                              setScenario(prev => ({ ...prev, mapBackgroundUrl: url }));
-                            }
+                            fileInputRef.current?.click();
                           }}
                       />
                       {/* Station legend below map on mobile/tablet */}
@@ -617,6 +639,13 @@ export default function Home() {
     {onboarding.phase === 'tour' && (
       <OnboardingTour onComplete={onboarding.complete} />
     )}
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={handleBackgroundFileChange}
+    />
     </>
   );
 }
