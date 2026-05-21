@@ -14,7 +14,7 @@ import { InputSidebar } from '@/components/app/input-sidebar';
 import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
-import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle, User, ClipboardList, RefreshCw } from 'lucide-react';
+import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle, User, ClipboardList, RefreshCw, Loader2 } from 'lucide-react';
 import { OnboardingTour, OnboardingPrompt, useOnboarding } from '@/components/app/onboarding-tour';
 import { useToast } from '@/hooks/use-toast';
 import { saveScenarioToHistory } from '@/lib/history';
@@ -66,6 +66,7 @@ export default function Home() {
   const [currentMapStep, setCurrentMapStep] = useState(0);
   const [authenticated, setAuthenticated] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
 
   // Check session auth on mount
   useEffect(() => {
@@ -174,7 +175,25 @@ export default function Home() {
     }));
   };
   
-  const handleDownloadTemplate = () => downloadTemplate();
+  const handleDownloadTemplate = async () => {
+    try {
+      setIsTemplateDownloading(true);
+      await downloadTemplate();
+      toast({
+        title: 'Plantilla descargada',
+        description: 'Se generó el archivo Excel con el formato actualizado.',
+      });
+    } catch (error) {
+      console.error('Error al descargar plantilla:', error);
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo descargar la plantilla',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo en unos segundos.',
+      });
+    } finally {
+      setIsTemplateDownloading(false);
+    }
+  };
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -376,9 +395,16 @@ export default function Home() {
             </div>
             <div className='flex items-center gap-1 sm:gap-2'>
               <WeatherAlert />
-              <Button variant="ghost" size="sm" onClick={handleDownloadTemplate} className="text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-3 text-muted-foreground hover:text-foreground">
-                  <Download className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Plantilla</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDownloadTemplate}
+                disabled={isTemplateDownloading}
+                className="group text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-3 text-muted-foreground hover:text-foreground border border-transparent hover:border-primary/15 hover:bg-primary/5 transition-all"
+                aria-busy={isTemplateDownloading}
+              >
+                  {isTemplateDownloading ? <Loader2 className="h-4 w-4 sm:mr-1.5 animate-spin text-primary" /> : <Download className="h-4 w-4 sm:mr-1.5 group-hover:text-primary transition-colors" />}
+                  <span className="hidden sm:inline">{isTemplateDownloading ? 'Generando...' : 'Plantilla'}</span>
               </Button>
               <Button variant="ghost" size="sm" onClick={handleImportClick} className="text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-3 text-muted-foreground hover:text-foreground">
                   <Upload className="h-4 w-4 sm:mr-1.5" />
