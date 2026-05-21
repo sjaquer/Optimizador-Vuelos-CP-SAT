@@ -168,6 +168,49 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
 
   const maxStation = form.watch('numStations');
 
+  const getReadableErrors = () => {
+    const list: string[] = [];
+    const errors = form.formState.errors;
+
+    if (errors.numStations) {
+      list.push(`Estaciones: ${errors.numStations.message}`);
+    }
+    if (errors.helicopterCapacity) {
+      list.push(`Capacidad: ${errors.helicopterCapacity.message}`);
+    }
+    if (errors.helicopterMaxWeight) {
+      list.push(`Peso Máx: ${errors.helicopterMaxWeight.message}`);
+    }
+    if (errors.paxDefaultWeight) {
+      list.push(`Peso PAX por defecto: ${errors.paxDefaultWeight.message}`);
+    }
+    if (errors.refuelConfig?.maxFlightDistance) {
+      list.push(`Combustible: ${errors.refuelConfig.maxFlightDistance.message}`);
+    }
+
+    if (errors.transportItems) {
+      if (Array.isArray(errors.transportItems)) {
+        errors.transportItems.forEach((itemErr, index) => {
+          if (!itemErr) return;
+          const prefix = `Ítem #${index + 1}`;
+          if (itemErr.area) list.push(`${prefix} (Área): ${itemErr.area.message}`);
+          if (itemErr.quantity) list.push(`${prefix} (Cantidad): ${itemErr.quantity.message}`);
+          if (itemErr.weight) list.push(`${prefix} (Peso): ${itemErr.weight.message}`);
+          if (itemErr.originStation) list.push(`${prefix} (Origen): ${itemErr.originStation.message}`);
+          if (itemErr.destinationStation) list.push(`${prefix} (Destino): ${itemErr.destinationStation.message}`);
+          if (itemErr.root) list.push(`${prefix}: ${itemErr.root.message}`);
+        });
+      } else {
+        const msg = (errors.transportItems as any).message;
+        if (msg) {
+          list.push(`Ítems: ${msg}`);
+        }
+      }
+    }
+
+    return list;
+  };
+
   return (
     <Form {...form}>
       <form className="flex h-full flex-col" onSubmit={handleFormSubmit} noValidate>
@@ -555,6 +598,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                                      <div className="flex justify-between"><span>Carga</span><strong className="text-amber-600 dark:text-amber-400">{cargoCount}</strong></div>
                                      <div className="flex justify-between"><span>Estaciones</span><strong className="text-foreground">{histScenario.numStations}</strong></div>
                                      <div className="flex justify-between"><span>Capacidad</span><strong className="text-foreground">{histScenario.helicopterCapacity} / {histScenario.helicopterMaxWeight}kg</strong></div>
+                                     <div className="flex justify-between col-span-2 border-t pt-1 mt-1"><span>Combustible</span><strong className="text-foreground">{histScenario.refuelConfig?.enabled ? `⛽ Sí (${histScenario.refuelConfig.maxFlightDistance} tramos)` : '❌ No'}</strong></div>
                                   </div>
 
                                   {/* Mission notes */}
@@ -580,7 +624,19 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
           </div>
         </div>
 
-        <SidebarFooter className="group-data-[collapsible=icon]:hidden p-3 border-t bg-card/80 backdrop-blur-sm">
+        <SidebarFooter className="group-data-[collapsible=icon]:hidden p-3 border-t bg-card/80 backdrop-blur-sm space-y-2">
+          {Object.keys(form.formState.errors).length > 0 && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg p-2.5 text-xs max-h-36 overflow-y-auto space-y-1">
+              <div className="font-bold flex items-center gap-1 text-red-600 dark:text-red-400">
+                <Shield className="h-3.5 w-3.5 shrink-0" /> Errores de Validación Pre-Vuelo:
+              </div>
+              <ul className="list-disc pl-3.5 space-y-0.5 font-medium text-red-500/90 dark:text-red-400/90">
+                {getReadableErrors().map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <Button type="submit" disabled={isLoading} className="w-full h-11 font-bold shadow-lg relative overflow-hidden group text-sm">
             {isLoading ? (
               <><Wind className="mr-2 h-4 w-4 animate-spin" /> Optimizando...</>

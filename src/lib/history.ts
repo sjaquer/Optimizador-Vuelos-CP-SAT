@@ -2,7 +2,7 @@
 'use client';
 
 import type { FlightPlan, ScenarioData, TransportItem, MissionDetails } from './types';
-import { ALL_STATIONS } from './stations';
+import { ALL_STATIONS, generateDefaultStations } from './stations';
 
 const HISTORY_KEY = 'ovh_flight_history_v2';
 const MAX_HISTORY_ITEMS = 20;
@@ -178,7 +178,7 @@ export function generateRandomScenario(): ScenarioData {
   const paxDefaultWeight = pick([75, 80, 85]);
 
   // Generate between 6 and 18 transport items for a robust test
-  const numItems = randInt(6, 18);
+  const numItems = randInt(8, 18);
   const transportItems: TransportItem[] = [];
 
   // Ensure a good mix: at least 30% PAX and 30% CARGO
@@ -195,17 +195,19 @@ export function generateRandomScenario(): ScenarioData {
       destination = randInt(0, numStations);
     }
 
+    const qty = randInt(1, 4);
+
     transportItems.push({
       id: crypto.randomUUID(),
       area: pick(AREAS),
       type: 'PAX',
       shift: pick(['M', 'T']),
       priority: randInt(1, 3) as 1 | 2 | 3,
-      quantity: 1,
+      quantity: qty,
       originStation: origin,
       destinationStation: destination,
-      weight: paxDefaultWeight,
-      description: `Pasajero de ${pick(AREAS)}`,
+      weight: paxDefaultWeight, // Keep for backward compat
+      description: `${qty} Pasajero(s) de ${pick(AREAS)}`,
     });
   }
 
@@ -251,6 +253,8 @@ export function generateRandomScenario(): ScenarioData {
     missionNotes: pick(MISSION_NOTES_OPTIONS),
   };
 
+  const refuelEnabled = pick([true, false]);
+
   return {
     numStations,
     helicopterCapacity,
@@ -260,5 +264,10 @@ export function generateRandomScenario(): ScenarioData {
     weatherConditions: pick(WEATHER_OPTIONS),
     operationalNotes: pick(OPERATIONAL_NOTES_OPTIONS),
     missionDetails,
+    refuelConfig: {
+      enabled: refuelEnabled,
+      maxFlightDistance: refuelEnabled ? pick([3.5, 4.5, 5.5, 6.5]) : 8.0,
+    },
+    customStations: generateDefaultStations(numStations),
   };
 }
