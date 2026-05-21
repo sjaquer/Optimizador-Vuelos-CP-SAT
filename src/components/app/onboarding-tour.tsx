@@ -36,7 +36,7 @@ const TOUR_STEPS: TourStep[] = [
       <div className="bg-card border rounded-lg p-3 text-xs space-y-2 w-full">
         <div className="flex items-center gap-2 font-semibold"><Users className="h-3.5 w-3.5 text-blue-500" /> PAX — Tipo: Pasajero</div>
         <div className="flex items-center gap-2 font-semibold"><Package className="h-3.5 w-3.5 text-amber-500" /> CARGO — Tipo: Carga</div>
-        <div className="text-muted-foreground">Cada ítem necesita: área, tipo, turno (M/T), prioridad (1-3), estación origen y destino.</div>
+        <div className="text-muted-foreground">Cada ítem necesita: área, tipo, turno (M/T), prioridad (Alta, Media, Baja), estación origen y destino.</div>
       </div>
     ),
     tip: 'Puedes agregar múltiples ítems manualmente o importar un Excel.',
@@ -67,7 +67,7 @@ const TOUR_STEPS: TourStep[] = [
     visual: (
       <div className="bg-card border rounded-lg p-3 text-xs space-y-1.5 w-full">
         <div className="font-semibold text-primary">Plan Optimizado</div>
-        <div className="text-muted-foreground">Prioridad P1→P2→P3 · PAX y Carga separados · Partida desde Base</div>
+        <div className="text-muted-foreground">Prioridad ALTA→MEDIA→BAJA · PAX y Carga separados · Partida desde Base</div>
       </div>
     ),
     tip: 'El plan muestra distancia total, vuelos, paradas, entregas PAX/CARGO y carga promedio.',

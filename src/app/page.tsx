@@ -264,9 +264,16 @@ export default function Home() {
             if (item.tipo !== 'PAX' && item.tipo !== 'CARGO') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'tipo' debe ser 'PAX' o 'CARGO'.`);
             if (!item.turno) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'turno'.`);
             if (item.turno !== 'M' && item.turno !== 'T') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'turno' debe ser 'M' o 'T'.`);
-            if (item.prioridad === undefined || item.prioridad.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'prioridad'.`);
-            const prio = Number(item.prioridad);
-            if (prio < 1 || prio > 3) throw new Error(`Error en la fila ${rowIndex} de 'Items': La prioridad debe ser 1, 2 o 3.`);
+            const rawPrio = item.prioridad !== undefined ? String(item.prioridad).trim().toUpperCase() : 'MEDIA';
+            let parsedPriority: 'ALTA' | 'MEDIA' | 'BAJA';
+            if (rawPrio === 'ALTA' || rawPrio === '1' || rawPrio === 'P1') {
+              parsedPriority = 'ALTA';
+            } else if (rawPrio === 'BAJA' || rawPrio === '3' || rawPrio === 'P3') {
+              parsedPriority = 'BAJA';
+            } else {
+              parsedPriority = 'MEDIA';
+            }
+
             if (item.origen === undefined || item.origen.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'origen'.`);
             if (item.destino === undefined || item.destino.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'destino'.`);
             
@@ -283,7 +290,7 @@ export default function Home() {
               area: item.area,
               type: item.tipo,
               shift: item.turno,
-              priority: prio as 1 | 2 | 3,
+              priority: parsedPriority,
               quantity: item.tipo === 'PAX' ? Number(item.cantidad) : 1,
               originStation: Number(item.origen),
               destinationStation: Number(item.destino),

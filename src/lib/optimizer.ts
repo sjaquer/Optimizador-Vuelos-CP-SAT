@@ -7,11 +7,17 @@ const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
 let _namesMap: Record<number, string> = {};
 const stationLabel = (id: number) => _namesMap[id] ?? `E-${id}`;
 
-// ──── Priority cost weights ─────────────────────────────────────────
-const PRIORITY_COST: Record<number, number> = {
-  1: 100,
-  2: 10,
-  3: 1,
+// ──── Priority values and cost weights ─────────────────────────────────────────
+const PRIORITY_VAL: Record<'ALTA' | 'MEDIA' | 'BAJA', number> = {
+  ALTA: 1,
+  MEDIA: 2,
+  BAJA: 3,
+};
+
+const PRIORITY_COST: Record<'ALTA' | 'MEDIA' | 'BAJA', number> = {
+  ALTA: 100,
+  MEDIA: 10,
+  BAJA: 1,
 };
 
 // ──── FIX #6: Improved scoring — considers total trip cost ──────────
@@ -24,18 +30,20 @@ function scoreItem(
   const distToOrigin = getDistance(currentStation, item.originStation, customStations);
   const distOriginToDest = getDistance(item.originStation, item.destinationStation, customStations);
   const totalTripCost = distToOrigin + distOriginToDest;
-  const priorityCost = PRIORITY_COST[item.priority] || 1;
+  const priorityCost = PRIORITY_COST[item.priority] || 10;
   // Higher priority (higher cost) + shorter trip = better score
   return priorityCost / Math.max(totalTripCost, 0.5);
 }
 
-// ──── FIX #7: Genuinely different variant strategies ────────────────
+// ──── Genuinely different variant strategies ────────────────
 
-// Variant 0: Greedy nearest-first with priority weighting
+// Variant 0: Urgent route - ALTA priority first, then MEDIA, then BAJA.
 function sortVariant0(items: TransportItem[], currentStation: number, customStations?: StationConfig[]): TransportItem[] {
   return [...items].sort((a, b) => {
     // Priority first
-    if (a.priority !== b.priority) return a.priority - b.priority;
+    if (a.priority !== b.priority) {
+      return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
+    }
     // Then nearest origin
     const dA = getDistance(currentStation, a.originStation, customStations);
     const dB = getDistance(currentStation, b.originStation, customStations);
@@ -43,23 +51,26 @@ function sortVariant0(items: TransportItem[], currentStation: number, customStat
   });
 }
 
-// Variant 1: Farthest-destination-first — serve the most remote stations first
+// Variant 1: Consolidated route - group items by origin and destination pairs so they are consolidated
 function sortVariant1(items: TransportItem[], customStations?: StationConfig[]): TransportItem[] {
   return [...items].sort((a, b) => {
-    // Farthest destination first (from base = station 0)
-    const dA = getDistance(0, a.destinationStation, customStations);
-    const dB = getDistance(0, b.destinationStation, customStations);
-    if (dA !== dB) return dB - dA; // descending: farthest first
+    // Group by origin first
+    if (a.originStation !== b.originStation) return a.originStation - b.originStation;
+    // Then destination
+    if (a.destinationStation !== b.destinationStation) return a.destinationStation - b.destinationStation;
     // Tie-break by priority
-    return a.priority - b.priority;
+    return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
   });
 }
 
-// Variant 2: Cluster-based — group items by destination zone, serve each zone fully
+// Variant 2: Cluster/Zone based route - segment destinations into 3 regions (near, medium, far)
 function sortVariant2(items: TransportItem[], customStations?: StationConfig[]): TransportItem[] {
-  // Cluster destinations into zones (thirds of max distance from base)
   const maxDist = Math.max(...items.map(i => getDistance(0, i.destinationStation, customStations)), 1);
-  const zoneOf = (station: number) => Math.floor(getDistance(0, station, customStations) / maxDist * 3);
+  const zoneOf = (station: number) => {
+    const d = getDistance(0, station, customStations);
+    const z = Math.floor(d / maxDist * 3);
+    return Math.min(z, 2);
+  };
 
   return [...items].sort((a, b) => {
     const zA = zoneOf(a.destinationStation);
@@ -68,7 +79,7 @@ function sortVariant2(items: TransportItem[], customStations?: StationConfig[]):
     // Within zone, group by destination
     if (a.destinationStation !== b.destinationStation) return a.destinationStation - b.destinationStation;
     // Then priority
-    return a.priority - b.priority;
+    return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
   });
 }
 
@@ -189,7 +200,7 @@ function buildTypeRoute(
     // ── PICKUP ──
     const available = pending
       .filter(p => p.originStation === currentStation)
-      .sort((a, b) => a.priority - b.priority);
+      .sort((a, b) => PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority]);
 
     const pickedUp: TransportItem[] = [];
     for (const item of available) {
@@ -221,15 +232,38 @@ function buildTypeRoute(
       const dropoffs = [...new Set(helicopter.map(p => p.destinationStation))];
 
       if (variant === 1) {
-        // Variant 1: farthest dropoff first
-        nextStation = dropoffs.sort((a, b) =>
-          getDistance(0, b, cs) - getDistance(0, a, cs)
-        )[0];
-      } else {
-        // Default & variant 2: nearest dropoff
+        // Variant 1 (Option B): nearest dropoff (greedy)
         nextStation = dropoffs.sort((a, b) =>
           getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs)
         )[0];
+      } else if (variant === 2) {
+        // Variant 2 (Option C): Zoned dropoff
+        const maxDest = Math.max(...allItems.map(i => getDistance(0, i.destinationStation, cs)), 1);
+        const zoneOf = (station: number) => {
+          const d = getDistance(0, station, cs);
+          const z = Math.floor(d / maxDest * 3);
+          return Math.min(z, 2);
+        };
+        nextStation = dropoffs.sort((a, b) => {
+          const zA = zoneOf(a);
+          const zB = zoneOf(b);
+          if (zA !== zB) return zA - zB;
+          return getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs);
+        })[0];
+      } else {
+        // Variant 0 (Option A): Urgent dropoff
+        // If there are ALTA items on board, go to nearest ALTA dropoff first
+        const altaOnBoard = helicopter.filter(p => p.priority === 'ALTA');
+        if (altaOnBoard.length > 0) {
+          const altaDropoffs = [...new Set(altaOnBoard.map(p => p.destinationStation))];
+          nextStation = altaDropoffs.sort((a, b) =>
+            getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs)
+          )[0];
+        } else {
+          nextStation = dropoffs.sort((a, b) =>
+            getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs)
+          )[0];
+        }
       }
 
       // FIX #1: POOLING — check intermediate stations for pending pickups along the route
@@ -255,38 +289,45 @@ function buildTypeRoute(
       }
     } else if (pending.length > 0) {
       if (variant === 1) {
-        // Variant 1: pick up items destined for the farthest station
-        let bestDist = -1;
-        let bestStation = -1;
+        // Variant 1 (Option B): consolidated - fly to the origin with highest pending payload
         const origins = [...new Set(pending.map(p => p.originStation))];
+        let bestStation = -1;
+        let maxWeight = -1;
         for (const origin of origins) {
           const stationItems = pending.filter(p => p.originStation === origin);
-          const maxDestDist = Math.max(...stationItems.map(i => getDistance(0, i.destinationStation, cs)));
-          if (maxDestDist > bestDist) {
-            bestDist = maxDestDist;
+          const totalWeight = stationItems.reduce((sum, item) => sum + item.weight, 0);
+          if (totalWeight > maxWeight) {
+            maxWeight = totalWeight;
             bestStation = origin;
           }
         }
         nextStation = bestStation;
       } else if (variant === 2) {
-        // Variant 2: cluster-based — pick the origin whose items belong to the nearest incomplete zone
-        const maxDest = Math.max(...pending.map(i => getDistance(0, i.destinationStation, cs)), 1);
-        const zoneOf = (station: number) => Math.floor(getDistance(0, station, cs) / maxDest * 3);
+        // Variant 2 (Option C): cluster-based — pick the origin whose items belong to the nearest incomplete zone
+        const maxDest = Math.max(...allItems.map(i => getDistance(0, i.destinationStation, cs)), 1);
+        const zoneOf = (station: number) => {
+          const d = getDistance(0, station, cs);
+          const z = Math.floor(d / maxDest * 3);
+          return Math.min(z, 2);
+        };
 
-        // Find nearest zone that still has pending items
-        const zones = [...new Set(pending.map(i => zoneOf(i.destinationStation)))].sort((a, b) => a - b);
-        const targetZone = zones[0];
-        const zoneItems = pending.filter(i => zoneOf(i.destinationStation) === targetZone);
+        const pendingZones = pending.map(i => zoneOf(i.destinationStation));
+        const minZone = Math.min(...pendingZones);
+        const zoneItems = pending.filter(i => zoneOf(i.destinationStation) === minZone);
         const origins = [...new Set(zoneItems.map(p => p.originStation))];
         // Nearest origin in that zone
         nextStation = origins.sort((a, b) => getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs))[0];
       } else {
-        // Variant 0: greedy nearest — best scoring station
+        // Variant 0 (Option A): urgent - pick the station that has the highest urgency items
+        // If there are ALTA items pending, only consider their origins
+        const altaPending = pending.filter(i => i.priority === 'ALTA');
+        const activePending = altaPending.length > 0 ? altaPending : pending;
+
         let bestScore = -1;
         let bestStation = -1;
-        const origins = [...new Set(pending.map(p => p.originStation))];
+        const origins = [...new Set(activePending.map(p => p.originStation))];
         for (const origin of origins) {
-          const stationItems = pending.filter(p => p.originStation === origin);
+          const stationItems = activePending.filter(p => p.originStation === origin);
           const totalScore = stationItems.reduce((sum, item) => sum + scoreItem(item, currentStation, cs), 0);
           if (totalScore > bestScore) {
             bestScore = totalScore;
@@ -377,8 +418,8 @@ function buildRoute(
     // Variant 1: CARGO first (farthest destinations often cargo)
     typeOrder = ['CARGO', 'PAX'];
   } else {
-    const bestPax = paxItems.length > 0 ? Math.min(...paxItems.map(i => i.priority)) : Infinity;
-    const bestCargo = cargoItems.length > 0 ? Math.min(...cargoItems.map(i => i.priority)) : Infinity;
+    const bestPax = paxItems.length > 0 ? Math.min(...paxItems.map(i => PRIORITY_VAL[i.priority])) : Infinity;
+    const bestCargo = cargoItems.length > 0 ? Math.min(...cargoItems.map(i => PRIORITY_VAL[i.priority])) : Infinity;
     typeOrder = bestPax <= bestCargo ? ['PAX', 'CARGO'] : ['CARGO', 'PAX'];
   }
 
@@ -462,9 +503,9 @@ function computeMetrics(
 
 // ──── Public API ────────────────────────────────────────────────────
 const VARIANT_LABELS: Record<number, string> = {
-  0: 'Plan Óptimo',
-  1: 'Alternativa A',
-  2: 'Alternativa B',
+  0: 'Opción A: Ruta Urgente',
+  1: 'Opción B: Ruta Consolidada',
+  2: 'Opción C: Ruta por Zonas',
 };
 
 export function runFlightOptimization(
@@ -541,10 +582,10 @@ export function runFlightOptimization(
     id: planId,
     title: planTitle,
     description: variant === 0
-      ? 'Optimización greedy: máxima eficiencia por cercanía y prioridad. PAX y Carga en vuelos separados.'
+      ? 'Ruta Urgente (Opción A): Prioriza al máximo la entrega inmediata de los requerimientos de prioridad ALTA.'
       : variant === 1
-      ? 'Alternativa: destinos más remotos primero para minimizar viajes largos de retorno. PAX y Carga separados.'
-      : 'Alternativa: agrupación por zonas de destino, sirviendo cada zona completamente. PAX y Carga separados.',
+      ? 'Ruta Consolidada (Opción B): Agrupa y consolida pasajeros y bultos por cercanía y peso para minimizar las distancias de vuelo.'
+      : 'Ruta por Zonas (Opción C): Segmenta geográficamente las estaciones por zonas (cercana, media y lejana) para realizar entregas secuenciales sin idas y vueltas.',
     steps,
     metrics,
   };

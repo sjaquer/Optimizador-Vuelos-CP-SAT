@@ -43,7 +43,7 @@ const transportItemSchema = z.object({
   area: z.string().min(1, 'Área requerida'),
   type: z.enum(['PAX', 'CARGO']),
   shift: z.enum(['M', 'T']),
-  priority: z.coerce.number().min(1).max(3) as unknown as z.ZodType<1 | 2 | 3>,
+  priority: z.enum(['ALTA', 'MEDIA', 'BAJA']),
   quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
   originStation: z.coerce.number().min(0),
   destinationStation: z.coerce.number().min(0),
@@ -446,13 +446,13 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                                 {isPax ? <Users className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
                                 #{index + 1}
                               </span>
-                              <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><FormControl><Input className="h-8 text-sm bg-background" placeholder="Área" {...field} /></FormControl></FormItem> )}/>
+                            <FormField control={form.control} name={`transportItems.${index}.area`} render={({ field }) => ( <FormItem className="flex-1 space-y-0"><FormControl><Input className="h-8 text-sm bg-background" placeholder="Área" {...field} /></FormControl></FormItem> )}/>
                             </div>
 
                             <div className="grid grid-cols-3 gap-1.5">
                                 <FormField control={form.control} name={`transportItems.${index}.type`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TIPO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="PAX">PAX</SelectItem><SelectItem value="CARGO">CARGA</SelectItem></SelectContent></Select></FormItem> )}/>
                                 <FormField control={form.control} name={`transportItems.${index}.shift`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">TRN</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="M">MAÑ</SelectItem><SelectItem value="T">TAR</SelectItem></SelectContent></Select></FormItem> )}/>
-                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PRIO</FormLabel><Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value)}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">P1</SelectItem><SelectItem value="2">P2</SelectItem><SelectItem value="3">P3</SelectItem></SelectContent></Select></FormItem> )}/>
+                                <FormField control={form.control} name={`transportItems.${index}.priority`} render={({ field }) => ( <FormItem className="space-y-0.5"><FormLabel className="text-[10px]">PRIO</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="ALTA">Alta</SelectItem><SelectItem value="MEDIA">Media</SelectItem><SelectItem value="BAJA">Baja</SelectItem></SelectContent></Select></FormItem> )}/>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-1.5">
@@ -501,7 +501,7 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                           </div>
                         );
                       })}
-                      <Button type="button" variant="outline" className="w-full h-10 text-sm border-dashed hover:border-solid hover:border-primary/40 hover:bg-primary/5 transition-all" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 2, quantity: 1, originStation: 0, destinationStation: 1, weight: 80, description: '' })}>
+                      <Button type="button" variant="outline" className="w-full h-10 text-sm border-dashed hover:border-solid hover:border-primary/40 hover:bg-primary/5 transition-all" onClick={() => append({ id: crypto.randomUUID(), area: '', type: 'PAX', shift: 'M', priority: 'MEDIA', quantity: 1, originStation: 0, destinationStation: 1, weight: 80, description: '' })}>
                         <Plus className="mr-2 h-4 w-4" /> Agregar Item
                       </Button>
                     </div>

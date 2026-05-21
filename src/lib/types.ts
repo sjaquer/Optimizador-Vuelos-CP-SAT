@@ -4,7 +4,7 @@ export interface TransportItem {
   area: string;
   type: 'PAX' | 'CARGO';
   shift: 'M' | 'T'; // Mañana o Tarde
-  priority: 1 | 2 | 3; // 1=Máxima urgencia, 2=Programación estándar, 3=Baja prioridad
+  priority: 'ALTA' | 'MEDIA' | 'BAJA'; // ALTA = Máxima urgencia, MEDIA = Estándar, BAJA = Baja prioridad
   quantity: number;
   originStation: number;
   destinationStation: number;

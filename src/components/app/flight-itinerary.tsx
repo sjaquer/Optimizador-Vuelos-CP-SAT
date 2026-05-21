@@ -21,7 +21,7 @@ const actionTranslations: Record<FlightStep['action'], string> = {
   REFUEL: 'REABASTECIMIENTO DE COMBUSTIBLE',
 };
 
-const priorityLabels: Record<number, string> = { 1: 'P1 Urgente', 2: 'P2 Estándar', 3: 'P3 Baja' };
+const priorityLabels: Record<'ALTA' | 'MEDIA' | 'BAJA', string> = { ALTA: 'Alta', MEDIA: 'Media', BAJA: 'Baja' };
 
 /** Extract flight number from notes like "[Vuelo #2] ..." */
 const getFlightNum = (notes: string): number | null => {
@@ -107,7 +107,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
             sName(step.station),
             step.items.map(i => i.type).join(', '),
             step.items.map(i => i.area).join(', '),
-            step.items.map(i => priorityLabels[i.priority] || `P${i.priority}`).join(', '),
+            step.items.map(i => priorityLabels[i.priority] || i.priority).join(', '),
             step.items.map(i => i.type === 'PAX' ? `${i.quantity} pax` : `${i.weight} kg`).join(', '),
             step.items.map(i => `${sName(i.originStation)} → ${sName(i.destinationStation)}`).join('\n'),
             noteText,
@@ -212,7 +212,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
               area: item.area,
               type: item.type,
               qty: item.quantity,
-              priority: priorityLabels[item.priority] || `P${item.priority}`,
+              priority: priorityLabels[item.priority] || item.priority,
               weight: item.weight,
               origin: sName(item.originStation),
               dest: sName(item.destinationStation),
@@ -388,7 +388,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
                             >
                               <ItemIcon className="mr-1.5 h-3.5 w-3.5 shrink-0" />
                               {item.area} - {item.type} {quantityLabel}
-                              <span className="opacity-75 font-normal ml-1.5">P{item.priority}</span>
+                              <span className="opacity-75 font-normal ml-1.5">{item.priority === 'ALTA' ? 'Alta' : item.priority === 'MEDIA' ? 'Media' : 'Baja'}</span>
                               <span className="ml-2 pl-2 border-l border-current/25 font-mono text-[10px] font-normal flex items-center gap-1.5">
                                 {sName(item.originStation)} <ArrowRight className="h-3 w-3" /> {sName(item.destinationStation)}
                               </span>

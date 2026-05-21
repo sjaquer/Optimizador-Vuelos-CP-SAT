@@ -76,7 +76,7 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
           {item.area} <span className="opacity-75 font-normal text-[10px] sm:text-xs">| {item.type}</span>
         </span>
         <span className="text-[10px] opacity-70 flex gap-2 mt-0.5 font-mono">
-          <span>PRIO: {item.priority}</span>
+          <span>PRIO: {item.priority === 'ALTA' ? 'Alta' : item.priority === 'MEDIA' ? 'Media' : 'Baja'}</span>
           <span>{item.type === 'PAX' ? `${item.quantity} pax` : `${item.weight} kg`}</span>
           <span className="truncate">{sName(item.originStation)} → {sName(item.destinationStation)}</span>
         </span>

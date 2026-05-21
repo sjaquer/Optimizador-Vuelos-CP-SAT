@@ -88,14 +88,14 @@ export async function GET() {
   itmHeader.height = 28;
 
   [
-    { area: 'Perforación', tipo: 'PAX', turno: 'M', prioridad: 1, cantidad: 3, origen: 0, destino: 2, peso: '', descripcion: '' },
-    { area: 'Geología', tipo: 'PAX', turno: 'M', prioridad: 2, cantidad: 2, origen: 0, destino: 4, peso: '', descripcion: '' },
-    { area: 'Logística', tipo: 'CARGO', turno: 'M', prioridad: 1, cantidad: 1, origen: 0, destino: 3, peso: 120, descripcion: 'Tubería HDD 6"' },
-    { area: 'Mantenimiento', tipo: 'PAX', turno: 'T', prioridad: 2, cantidad: 1, origen: 3, destino: 0, peso: '', descripcion: '' },
-    { area: 'Medio Ambiente', tipo: 'PAX', turno: 'M', prioridad: 3, cantidad: 2, origen: 0, destino: 7, peso: '', descripcion: '' },
-    { area: 'Obras Civiles', tipo: 'CARGO', turno: 'T', prioridad: 2, cantidad: 1, origen: 0, destino: 6, peso: 200, descripcion: 'Cemento y herramientas' },
-    { area: 'Seguridad', tipo: 'PAX', turno: 'T', prioridad: 1, cantidad: 4, origen: 2, destino: 0, peso: '', descripcion: '' },
-    { area: 'Campamento', tipo: 'CARGO', turno: 'M', prioridad: 3, cantidad: 1, origen: 0, destino: 5, peso: 85, descripcion: 'Víveres y agua' },
+    { area: 'Perforación', tipo: 'PAX', turno: 'M', prioridad: 'ALTA', cantidad: 3, origen: 0, destino: 2, peso: '', descripcion: '' },
+    { area: 'Geología', tipo: 'PAX', turno: 'M', prioridad: 'MEDIA', cantidad: 2, origen: 0, destino: 4, peso: '', descripcion: '' },
+    { area: 'Logística', tipo: 'CARGO', turno: 'M', prioridad: 'ALTA', cantidad: 1, origen: 0, destino: 3, peso: 120, descripcion: 'Tubería HDD 6"' },
+    { area: 'Mantenimiento', tipo: 'PAX', turno: 'T', prioridad: 'MEDIA', cantidad: 1, origen: 3, destino: 0, peso: '', descripcion: '' },
+    { area: 'Medio Ambiente', tipo: 'PAX', turno: 'M', prioridad: 'BAJA', cantidad: 2, origen: 0, destino: 7, peso: '', descripcion: '' },
+    { area: 'Obras Civiles', tipo: 'CARGO', turno: 'T', prioridad: 'MEDIA', cantidad: 1, origen: 0, destino: 6, peso: 200, descripcion: 'Cemento y herramientas' },
+    { area: 'Seguridad', tipo: 'PAX', turno: 'T', prioridad: 'ALTA', cantidad: 4, origen: 2, destino: 0, peso: '', descripcion: '' },
+    { area: 'Campamento', tipo: 'CARGO', turno: 'M', prioridad: 'BAJA', cantidad: 1, origen: 0, destino: 5, peso: 85, descripcion: 'Víveres y agua' },
   ].forEach(row => {
     const rowItem = wsItems.addRow(row);
     const fill = row.tipo === 'PAX' ? PAX_FILL : CARGO_FILL;
@@ -108,7 +108,7 @@ export async function GET() {
     '• "area": Nombre del área o departamento solicitante.',
     '• "tipo": Escribir PAX (pasajeros) o CARGO (carga). No se mezclan en un mismo vuelo.',
     '• "turno": M = Mañana, T = Tarde. Los turnos no se mezclan.',
-    '• "prioridad": 1 (Máxima urgencia), 2 (Programación estándar), 3 (Baja prioridad).',
+    '• "prioridad": ALTA (Máxima urgencia), MEDIA (Estándar), BAJA (Baja prioridad).',
     '• "cantidad": Solo para PAX, indicar número de personas.',
     '• "origen" / "destino": ID de estación (ver hoja Configuracion). 0 = Base.',
     '• "peso": Solo para CARGO, peso en kg. PAX usa peso estándar configurado.',
@@ -132,8 +132,8 @@ export async function GET() {
     showErrorMessage: true, errorTitle: 'Turno inválido', error: 'Solo M (Mañana) o T (Tarde).',
   });
   wsItemsAny.dataValidations.add('D2:D200', {
-    type: 'whole', allowBlank: false, operator: 'between',
-    formulae: [1, 3], showErrorMessage: true, errorTitle: 'Prioridad', error: 'Valor entre 1 y 3 (1=Urgente, 2=Estándar, 3=Baja).',
+    type: 'list', allowBlank: false, formulae: ['"ALTA,MEDIA,BAJA"'],
+    showErrorMessage: true, errorTitle: 'Prioridad inválida', error: 'Solo ALTA, MEDIA o BAJA.',
   });
 
   wsItems.views = [{ state: 'frozen', ySplit: 1 }];
