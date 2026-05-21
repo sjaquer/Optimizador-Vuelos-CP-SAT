@@ -35,6 +35,8 @@ export async function downloadTemplate() {
     { Clave: 'numStations', Valor: 8, Descripcion: 'Número de estaciones activas (sin contar la Base). Máx: ' + (ALL_STATIONS.length - 1) },
     { Clave: 'helicopterCapacity', Valor: 4, Descripcion: 'Asientos disponibles en el helicóptero (sin contar tripulación)' },
     { Clave: 'helicopterMaxWeight', Valor: 500, Descripcion: 'Peso máximo de carga útil en kilogramos' },
+    { Clave: 'refuelEnabled', Valor: 'FALSE', Descripcion: 'Activar sistema de reabastecimiento de combustible (TRUE / FALSE)' },
+    { Clave: 'refuelMaxFlightDistance', Valor: 10, Descripcion: 'Distancia máxima de vuelo (en unidades) antes de necesitar reabastecimiento' },
   ];
   cfgData.forEach((row, i) => {
     const r = wsConfig.addRow(row);

@@ -13,7 +13,7 @@ export function CurrentDateTime() {
 
     const timerId = setInterval(() => {
       setDate(new Date());
-    }, 1000); // Update every second
+    }, 60000); // Update every minute
 
     // Cleanup interval on component unmount
     return () => clearInterval(timerId);
@@ -32,7 +32,6 @@ export function CurrentDateTime() {
     ? new Intl.DateTimeFormat('es-ES', {
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
         hour12: false,
       }).format(date)
     : 'Cargando hora...';

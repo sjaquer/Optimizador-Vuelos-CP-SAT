@@ -13,7 +13,7 @@ export interface TransportItem {
 }
 
 export interface FlightStep {
-  action: 'TRAVEL' | 'PICKUP' | 'DROPOFF';
+  action: 'TRAVEL' | 'PICKUP' | 'DROPOFF' | 'REFUEL';
   station: number;
   items: TransportItem[];
   notes: string;
@@ -35,6 +35,8 @@ export interface FlightPlan {
     maxWeightRatio: number;
     avgLoadRatio: number;
     totalFlights: number;
+    refuelStops: number;
+    impossibleItems: number;
   };
 }
 
@@ -48,6 +50,21 @@ export interface MissionDetails {
   missionNotes?: string;
 }
 
+/** Configuración de reabastecimiento */
+export interface RefuelConfig {
+  enabled: boolean;
+  /** Distancia máxima (en unidades) antes de necesitar retorno a base para recargar */
+  maxFlightDistance: number;
+}
+
+/** Configuración de una estación con coordenadas editables */
+export interface StationConfig {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+}
+
 export interface ScenarioData {
     id?: string; // Unique identifier for history
     numStations: number;
@@ -59,4 +76,10 @@ export interface ScenarioData {
     operationalNotes?: string;
     missionDetails?: MissionDetails;
     calculatedPlans?: Record<string, FlightPlan>;
+    /** Configuración de reabastecimiento de combustible */
+    refuelConfig?: RefuelConfig;
+    /** Coordenadas personalizadas de estaciones (overrides ALL_STATIONS) */
+    customStations?: StationConfig[];
+    /** URL o data-url de imagen de fondo para el mapa */
+    mapBackgroundUrl?: string;
 }

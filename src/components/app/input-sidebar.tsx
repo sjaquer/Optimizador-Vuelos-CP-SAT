@@ -35,7 +35,8 @@ import {
 import { CurrentDateTime } from './current-date-time';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ALL_STATIONS, getActiveStations } from '@/lib/stations';
-
+import { Switch } from '@/components/ui/switch';
+import { Map, RotateCcw } from 'lucide-react';
 
 const transportItemSchema = z.object({
   id: z.string(),
@@ -67,6 +68,17 @@ const formSchema = z.object({
     clientOrProject: z.string().optional(),
     missionNotes: z.string().optional(),
   }).optional(),
+  refuelConfig: z.object({
+    enabled: z.boolean(),
+    maxFlightDistance: z.coerce.number().min(0.1, 'Autonomía mínima de 0.1'),
+  }).optional(),
+  customStations: z.array(z.object({
+    id: z.coerce.number(),
+    name: z.string(),
+    x: z.coerce.number(),
+    y: z.coerce.number(),
+  })).optional(),
+  mapBackgroundUrl: z.string().optional(),
 }).refine(data => {
     return data.transportItems.every(p => p.originStation <= data.numStations && p.destinationStation <= data.numStations);
 }, { message: "Estación debe ser <= al nro de estaciones", path: ["transportItems"] })
@@ -287,7 +299,91 @@ export function InputSidebar({ scenario, setScenario, onGeneratePlans, isLoading
                         <FormField control={form.control} name="helicopterMaxWeight" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Carga Máx (kg)</FormLabel><FormControl><Input type="number" className="h-9 font-medium bg-background text-sm" {...field} /></FormControl></FormItem> )}/>
                         <FormField control={form.control} name="paxDefaultWeight" render={({ field }) => ( <FormItem><FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Peso PAX</FormLabel><FormControl><Input type="number" className="h-9 font-medium bg-background text-sm" {...field} /></FormControl></FormItem> )}/>
                      </div>
+                     
+                     {/* Sistema de Combustible (Refuel) */}
+                     <div className="border-t border-border/50 px-3 py-2.5 bg-muted/20">
+                       <div className="flex items-center justify-between mb-1.5">
+                         <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1.5">
+                           Sistema de Combustible
+                         </FormLabel>
+                         <FormField
+                           control={form.control}
+                           name="refuelConfig.enabled"
+                           render={({ field }) => (
+                             <FormControl>
+                               <Switch
+                                 checked={field.value ?? false}
+                                 onCheckedChange={field.onChange}
+                                 aria-label="Activar Reabastecimiento"
+                               />
+                             </FormControl>
+                           )}
+                         />
+                       </div>
+                       {form.watch('refuelConfig.enabled') && (
+                         <FormField
+                           control={form.control}
+                           name="refuelConfig.maxFlightDistance"
+                           render={({ field }) => (
+                             <FormItem className="space-y-1 mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                               <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Autonomía (Tramos sin recarga)</FormLabel>
+                               <FormControl>
+                                 <Input
+                                   type="number"
+                                   step="0.1"
+                                   className="h-8 font-medium bg-background text-xs"
+                                   placeholder="Ej: 8.0"
+                                   {...field}
+                                 />
+                               </FormControl>
+                               <FormMessage className="text-[10px]" />
+                             </FormItem>
+                           )}
+                         />
+                       )}
+                     </div>
                      <FormMessage className="text-xs mt-2">{form.formState.errors.numStations?.message || form.formState.errors.helicopterCapacity?.message || form.formState.errors.helicopterMaxWeight?.message}</FormMessage>
+                  </div>
+
+                  {/* Configuración de Mapa */}
+                  <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-2 flex items-center gap-1.5">
+                       <Map className="h-3.5 w-3.5" /> Mapa y Estaciones
+                     </h3>
+                     <div className="space-y-3 px-3 pb-3">
+                        <FormField
+                          control={form.control}
+                          name="mapBackgroundUrl"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="text-[10px] uppercase font-semibold text-muted-foreground">Imagen de Fondo (URL)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="https://..."
+                                  className="h-8 text-xs bg-background"
+                                  {...field}
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs h-8 gap-1.5"
+                          onClick={() => {
+                            form.setValue('customStations', []);
+                            toast({
+                              title: 'Posiciones Reiniciadas',
+                              description: 'Las coordenadas de las estaciones se han reiniciado a las por defecto.',
+                            });
+                          }}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" /> Reiniciar Coordenadas
+                        </Button>
+                     </div>
                   </div>
                   
                   <div className="bg-card border rounded-lg shadow-sm overflow-hidden">

@@ -33,6 +33,7 @@ import { StationLegend } from '@/components/app/station-legend';
 import { FlightManifest } from '@/components/app/flight-manifest';
 import { runFlightOptimization } from '@/lib/optimizer';
 import { FlightItinerary } from '@/components/app/flight-itinerary';
+import { generateDefaultStations } from '@/lib/stations';
 
 
 export default function Home() {
@@ -91,8 +92,9 @@ export default function Home() {
       .filter(Boolean) as FlightPlan[];
   }, [calculatedPlans, activeShift]);
 
-  const handleGeneratePlans = () => {
-    if (scenario.transportItems.length === 0) {
+  const handleGeneratePlans = (latestScenario?: ScenarioData) => {
+    const activeScenario = latestScenario || scenario;
+    if (activeScenario.transportItems.length === 0) {
         toast({
             variant: 'destructive',
             title: 'No hay ítems',
@@ -113,18 +115,18 @@ export default function Home() {
         const shifts: ('M' | 'T')[] = ['M', 'T'];
 
         for (const shift of shifts) {
-            const itemsForShift = scenario.transportItems.filter(item => item.shift === shift);
+            const itemsForShift = activeScenario.transportItems.filter(item => item.shift === shift);
             // Variant 0: optimal plan
-            const calculated = runFlightOptimization(itemsForShift, scenario, shift, 0);
+            const calculated = runFlightOptimization(itemsForShift, activeScenario, shift, 0);
             newCalculatedPlans[calculated.id] = calculated;
             // Variant 1 & 2: alternatives
             for (const v of [1, 2]) {
-              const alt = runFlightOptimization(itemsForShift, scenario, shift, v);
+              const alt = runFlightOptimization(itemsForShift, activeScenario, shift, v);
               newCalculatedPlans[alt.id] = alt;
             }
         }
         
-        setBasePlans([{ id: 'optimized', title: 'Plan Óptimo', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0 } }]);
+        setBasePlans([{ id: 'optimized', title: 'Plan Óptimo', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0, refuelStops: 0, impossibleItems: 0 } }]);
         setCalculatedPlans(newCalculatedPlans);
         
         // Auto-select the morning plan
@@ -133,7 +135,7 @@ export default function Home() {
           setSelectedPlanId('optimized_M');
         }
         
-        saveScenarioToHistory(scenario, newCalculatedPlans);
+        saveScenarioToHistory(activeScenario, newCalculatedPlans);
         
         toast({
             title: 'Éxito',
@@ -151,6 +153,25 @@ export default function Home() {
          setIsLoading(false);
       }
     }, 500);
+  };
+
+  const handleStationDrag = (stationId: number, x: number, y: number) => {
+    const defaultStations = generateDefaultStations(scenario.numStations);
+    const currentCustom = scenario.customStations && scenario.customStations.length > 0
+      ? scenario.customStations
+      : defaultStations;
+
+    const updated = currentCustom.map(s => {
+      if (s.id === stationId) {
+        return { ...s, x, y };
+      }
+      return s;
+    });
+
+    setScenario(prev => ({
+      ...prev,
+      customStations: updated,
+    }));
   };
   
   const handleDownloadTemplate = () => downloadTemplate();
@@ -439,50 +460,58 @@ export default function Home() {
                         <span className="hidden sm:inline">PAX/Carga separados · P1→P2→P3</span>
                       </div>
 
-                      <div className="max-w-2xl mx-auto px-0 sm:px-0">
-                        {planForActiveShift && (
-                            <div className="space-y-3 sm:space-y-4">
-                            <FlightPlanCard 
-                              plan={planForActiveShift}
-                              onSelectPlan={handlePlanSelection}
-                              isSelected={selectedPlanId === planForActiveShift.id}
-                            />
-                            <div className="flex justify-center">
-                              <Button
-                                variant={showAlternatives ? 'secondary' : 'outline'}
-                                size="default"
-                                onClick={() => setShowAlternatives(v => !v)}
-                                className="shadow-sm h-10 sm:h-11 px-4 sm:px-5 text-xs sm:text-sm"
-                              >
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                {showAlternatives ? 'Ocultar alternativas' : 'Probar otras opciones'}
-                              </Button>
+                      <div className="max-w-7xl mx-auto px-0">
+                        {planForActiveShift ? (
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {/* Optimal Plan Card */}
+                              <div className="flex flex-col h-full">
+                                <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 px-1 text-center font-mono">
+                                  Opción Óptima (A)
+                                </div>
+                                <FlightPlanCard 
+                                  plan={planForActiveShift}
+                                  onSelectPlan={handlePlanSelection}
+                                  isSelected={selectedPlanId === planForActiveShift.id}
+                                />
+                              </div>
+
+                              {/* Alternative 1 Card */}
+                              {alternativePlans[0] && (
+                                <div className="flex flex-col h-full animate-fade-up" style={{ animationDelay: '100ms' }}>
+                                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1 text-center font-mono">
+                                    Alternativa B
+                                  </div>
+                                  <FlightPlanCard 
+                                    plan={alternativePlans[0]}
+                                    onSelectPlan={handlePlanSelection}
+                                    isSelected={selectedPlanId === alternativePlans[0].id}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Alternative 2 Card */}
+                              {alternativePlans[1] && (
+                                <div className="flex flex-col h-full animate-fade-up" style={{ animationDelay: '200ms' }}>
+                                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1 text-center font-mono">
+                                    Alternativa C
+                                  </div>
+                                  <FlightPlanCard 
+                                    plan={alternativePlans[1]}
+                                    onSelectPlan={handlePlanSelection}
+                                    isSelected={selectedPlanId === alternativePlans[1].id}
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                        {!planForActiveShift && (
-                          <div className="text-center py-16 text-muted-foreground">
-                            <p className="text-base">No hay plan calculado para este turno.</p>
+                        ) : (
+                          <div className="text-center py-16 text-muted-foreground bg-muted/10 border rounded-xl">
+                            <p className="text-base font-semibold">No hay plan calculado para este turno.</p>
+                            <p className="text-xs mt-1">Modifica los requerimientos en el panel lateral y presiona "Calcular Plan Operativo".</p>
                           </div>
                         )}
                       </div>
-
-                      {/* Alternative plans */}
-                      {showAlternatives && alternativePlans.length > 0 && (
-                        <div className="max-w-4xl mx-auto mt-5">
-                          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">Alternativas</p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {alternativePlans.map(alt => (
-                              <FlightPlanCard
-                                key={alt.id}
-                                plan={alt}
-                                onSelectPlan={handlePlanSelection}
-                                isSelected={selectedPlanId === alt.id}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
                   </div>
                 )}
                 
@@ -491,7 +520,7 @@ export default function Home() {
                 {activeView === 'map' && selectedPlan && (
                   <div className='grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[250px_1fr_280px] gap-4 sm:gap-6 items-start'>
                      <div className="hidden xl:block">
-                       <StationLegend numStations={scenario.numStations} />
+                       <StationLegend numStations={scenario.numStations} customStations={scenario.customStations} />
                      </div>
                      <div className="col-span-1 lg:col-span-1">
                        <RouteMap 
@@ -499,10 +528,19 @@ export default function Home() {
                           numStations={scenario.numStations}
                           currentStep={currentMapStep}
                           onStepChange={setCurrentMapStep}
+                          customStations={scenario.customStations}
+                          mapBackgroundUrl={scenario.mapBackgroundUrl}
+                          onStationDrag={handleStationDrag}
+                          onBackgroundUpload={() => {
+                            const url = prompt("Introduce la URL de la imagen de fondo para el mapa:");
+                            if (url !== null) {
+                              setScenario(prev => ({ ...prev, mapBackgroundUrl: url }));
+                            }
+                          }}
                       />
                       {/* Station legend below map on mobile/tablet */}
                       <div className="xl:hidden mt-4">
-                        <StationLegend numStations={scenario.numStations} />
+                        <StationLegend numStations={scenario.numStations} customStations={scenario.customStations} />
                       </div>
                      </div>
                     <div className='flex flex-col gap-4 sm:gap-6'>

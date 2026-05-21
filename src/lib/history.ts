@@ -20,6 +20,22 @@ export const getHistory = (): ScenarioData[] => {
   }
 };
 
+/**
+ * Strips step data from calculated plans to reduce localStorage size.
+ * Only metrics are preserved — steps can be recalculated on demand.
+ */
+function stripStepsFromPlans(plans?: Record<string, FlightPlan>): Record<string, FlightPlan> | undefined {
+  if (!plans) return undefined;
+  const stripped: Record<string, FlightPlan> = {};
+  for (const [key, plan] of Object.entries(plans)) {
+    stripped[key] = {
+      ...plan,
+      steps: [], // do NOT store steps — they are the bulk of the data
+    };
+  }
+  return stripped;
+}
+
 export const saveScenarioToHistory = (scenario: ScenarioData, plans?: Record<string, FlightPlan>): void => {
    if (typeof window === 'undefined') {
     return;
@@ -30,7 +46,7 @@ export const saveScenarioToHistory = (scenario: ScenarioData, plans?: Record<str
   const newScenarioWithId: ScenarioData = {
       ...scenario,
       id: new Date().toISOString(),
-      calculatedPlans: plans,
+      calculatedPlans: stripStepsFromPlans(plans),
   };
 
   const newHistory = [newScenarioWithId, ...history].slice(0, MAX_HISTORY_ITEMS);
