@@ -6,14 +6,14 @@ import type { FlightPlan, TransportItem } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, Users, Package, ArrowRight, Waypoints } from 'lucide-react';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { stationNamesMap } from '@/lib/stations';
 
 interface FlightManifestProps {
   plan: FlightPlan;
   currentStep: number;
+  namesMap?: Record<string, string>;
 }
 
-export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
+export function FlightManifest({ plan, currentStep, namesMap }: FlightManifestProps) {
   const flightPath = useMemo(() => plan.steps.filter(s => s.action === 'TRAVEL'), [plan]);
   
   const manifestData = useMemo(() => {
@@ -23,7 +23,7 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
     const endStationId = currentTravelStep.station;
 
     const previousTravelStep = currentStep > 0 ? flightPath[currentStep - 1] : null;
-    const startStationId = previousTravelStep?.station ?? 0;
+    const startStationId = previousTravelStep?.station ?? '';
 
     const currentTravelStepIndex = plan.steps.findIndex(step => step === currentTravelStep);
     const prevTravelStepIndex = previousTravelStep 
@@ -57,7 +57,7 @@ export function FlightManifest({ plan, currentStep }: FlightManifestProps) {
     };
   }, [currentStep, plan, flightPath]);
 
-  const sName = (id: number) => stationNamesMap[id] ?? `E-${id}`;
+  const sName = (id: string) => namesMap?.[id] ?? id;
 
   const ItemBadge = ({ item, isPickup }: { item: TransportItem, isPickup: boolean }) => (
     <div 

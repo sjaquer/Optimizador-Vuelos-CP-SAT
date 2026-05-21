@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { InputSidebar } from '@/components/app/input-sidebar';
-import type { FlightPlan, TransportItem, ScenarioData } from '@/lib/types';
+import type { FlightPlan, TransportItem, ScenarioData, StationConfig } from '@/lib/types';
 import { FlightPlanCard } from '@/components/app/flight-plan-card';
 import { RouteMap } from '@/components/app/route-map';
 import { Map, ListCollapse, Wind, Upload, Download, CalendarDays, Milestone, Plane, ShieldCheck, Users, Package, HelpCircle, User, ClipboardList, RefreshCw, Loader2 } from 'lucide-react';
@@ -33,12 +33,12 @@ import { StationLegend } from '@/components/app/station-legend';
 import { FlightManifest } from '@/components/app/flight-manifest';
 import { runFlightOptimization } from '@/lib/optimizer';
 import { FlightItinerary } from '@/components/app/flight-itinerary';
-import { generateDefaultStations } from '@/lib/stations';
+import { DEFAULT_STATIONS, buildNamesMap } from '@/lib/stations';
 
 
 export default function Home() {
   const [scenario, setScenario] = useState<ScenarioData>({
-    numStations: 8,
+    stations: DEFAULT_STATIONS,
     helicopterCapacity: 4,
     helicopterMaxWeight: 500,
     paxDefaultWeight: 80,
@@ -54,6 +54,10 @@ export default function Home() {
       clientOrProject: '',
       missionNotes: '',
     },
+    refuelConfig: {
+      enabled: false,
+      maxFlightDistance: 80,
+    },
   });
 
   const [basePlans, setBasePlans] = useState<FlightPlan[]>([]);
@@ -65,7 +69,6 @@ export default function Home() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentMapStep, setCurrentMapStep] = useState(0);
   const [authenticated, setAuthenticated] = useState(false);
-  const [showAlternatives, setShowAlternatives] = useState(false);
   const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
 
   // Check session auth on mount
@@ -76,6 +79,9 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const onboarding = useOnboarding();
+
+  // Build namesMap from current scenario stations
+  const namesMap = useMemo(() => buildNamesMap(scenario.stations), [scenario.stations]);
   
   const selectedPlan = useMemo(() => {
     if (!selectedPlanId) return null;
@@ -108,7 +114,6 @@ export default function Home() {
     setSelectedPlanId(null);
     setActiveView('plans');
     setActiveShift('M');
-    setShowAlternatives(false);
 
     setTimeout(() => {
       try {
@@ -117,10 +122,8 @@ export default function Home() {
 
         for (const shift of shifts) {
             const itemsForShift = activeScenario.transportItems.filter(item => item.shift === shift);
-            // Variant 0: optimal plan
             const calculated = runFlightOptimization(itemsForShift, activeScenario, shift, 0);
             newCalculatedPlans[calculated.id] = calculated;
-            // Variant 1 & 2: alternatives
             for (const v of [1, 2]) {
               const alt = runFlightOptimization(itemsForShift, activeScenario, shift, v);
               newCalculatedPlans[alt.id] = alt;
@@ -130,7 +133,6 @@ export default function Home() {
         setBasePlans([{ id: 'optimized', title: 'Plan Óptimo', steps: [], metrics: { totalStops: 0, totalDistance: 0, totalLegs: 0, itemsTransported: 0, itemsNotDelivered: 0, totalWeight: 0, maxWeightRatio: 0, avgLoadRatio: 0, totalFlights: 0, refuelStops: 0, impossibleItems: 0 } }]);
         setCalculatedPlans(newCalculatedPlans);
         
-        // Auto-select the morning plan
         const morningPlan = newCalculatedPlans['optimized_M'];
         if (morningPlan && morningPlan.steps.length > 0) {
           setSelectedPlanId('optimized_M');
@@ -156,23 +158,17 @@ export default function Home() {
     }, 500);
   };
 
-  const handleStationDrag = (stationId: number, x: number, y: number) => {
-    const defaultStations = generateDefaultStations(scenario.numStations);
-    const currentCustom = scenario.customStations && scenario.customStations.length > 0
-      ? scenario.customStations
-      : defaultStations;
-
-    const updated = currentCustom.map(s => {
-      if (s.id === stationId) {
-        return { ...s, x, y };
-      }
-      return s;
-    });
-
+  // Station drag updates coordinates in km
+  const handleStationDrag = (stationId: string, x: number, y: number) => {
     setScenario(prev => ({
       ...prev,
-      customStations: updated,
+      stations: prev.stations.map(s => s.id === stationId ? { ...s, x, y } : s),
     }));
+  };
+
+  // Full stations CRUD from StationManager
+  const handleStationsChange = (newStations: StationConfig[]) => {
+    setScenario(prev => ({ ...prev, stations: newStations }));
   };
   
   const handleDownloadTemplate = async () => {
@@ -239,14 +235,47 @@ export default function Home() {
         if (!configSheet) throw new Error("No se encontró la hoja 'Configuracion'.");
         const configJson = sheetToJson(configSheet) as { Clave: string; Valor: any }[];
 
-        const getConfigValue = (key: string) => {
-            const row = configJson.find(r => r.Clave === key);
-            if (row === undefined || row.Valor === undefined || row.Valor === '') throw new Error(`Falta el valor para '${key}' en la hoja 'Configuracion'.`);
-            return row.Valor;
+        const getConfigValueOptional = (key: string) => {
+          const row = configJson.find(r => r.Clave === key);
+          return row?.Valor;
         };
-        const numStations = getConfigValue('numStations');
+        const getConfigValue = (key: string) => {
+          const val = getConfigValueOptional(key);
+          if (val === undefined || val === '') throw new Error(`Falta el valor para '${key}' en la hoja 'Configuracion'.`);
+          return val;
+        };
+
         const helicopterCapacity = getConfigValue('helicopterCapacity');
         const helicopterMaxWeight = getConfigValue('helicopterMaxWeight');
+        const refuelEnabledRaw = getConfigValueOptional('refuelEnabled');
+        const refuelEnabled = refuelEnabledRaw === true || String(refuelEnabledRaw).toUpperCase() === 'TRUE';
+        const refuelMaxDist = Number(getConfigValueOptional('refuelMaxFlightDistance') ?? 80);
+
+        // Build station lookup by name (for Excel compatibility)
+        const stationsByName: Record<string, string> = {};
+        for (const s of scenario.stations) {
+          stationsByName[s.name.toLowerCase().trim()] = s.id;
+          stationsByName[s.id] = s.id; // also allow slug directly
+        }
+        // Also allow numeric IDs for backward compat (map number → slug by index)
+        const stationsByIndex: Record<number, string> = {};
+        scenario.stations.forEach((s, i) => { stationsByIndex[i] = s.id; });
+        // Special case: 0 = base
+        const baseId = scenario.stations.find(s => s.isBase)?.id ?? scenario.stations[0]?.id ?? '';
+
+        const resolveStation = (raw: any, rowIndex: number, col: string): string => {
+          if (raw === undefined || raw === null || raw === '') throw new Error(`Falta el valor en la columna '${col}' en la fila ${rowIndex}.`);
+          const rawStr = String(raw).trim();
+          // Try by name
+          if (stationsByName[rawStr.toLowerCase()]) return stationsByName[rawStr.toLowerCase()];
+          // Try by numeric index (backward compat)
+          const num = Number(rawStr);
+          if (!isNaN(num)) {
+            if (num === 0) return baseId;
+            if (stationsByIndex[num]) return stationsByIndex[num];
+          }
+          throw new Error(`Estación '${rawStr}' en la columna '${col}' (fila ${rowIndex}) no existe. Verifica los nombres en la hoja 'Configuracion'.`);
+        };
 
         // --- Items Sheet Validation ---
         const itemsSheet = workbook.getWorksheet('Items');
@@ -254,35 +283,29 @@ export default function Home() {
         const itemsJson = sheetToJson(itemsSheet) as any[];
 
         const transportItems: TransportItem[] = itemsJson
-            .filter(item => item.area && item.area.toString().trim() !== '') // Ignore empty rows
+            .filter(item => item.area && item.area.toString().trim() !== '')
             .map((item, index) => {
-            const rowIndex = index + 2; // +1 for header, +1 for 0-based index
+            const rowIndex = index + 2;
 
-            // General validations for required fields
-            if (!item.area) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'area'.`);
-            if (!item.tipo) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'tipo'.`);
-            if (item.tipo !== 'PAX' && item.tipo !== 'CARGO') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'tipo' debe ser 'PAX' o 'CARGO'.`);
-            if (!item.turno) throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'turno'.`);
-            if (item.turno !== 'M' && item.turno !== 'T') throw new Error(`Error en la fila ${rowIndex} de 'Items': El valor en 'turno' debe ser 'M' o 'T'.`);
+            if (!item.area) throw new Error(`Fila ${rowIndex}: Falta 'area'.`);
+            if (!item.tipo) throw new Error(`Fila ${rowIndex}: Falta 'tipo'.`);
+            if (item.tipo !== 'PAX' && item.tipo !== 'CARGO') throw new Error(`Fila ${rowIndex}: 'tipo' debe ser PAX o CARGO.`);
+            if (!item.turno) throw new Error(`Fila ${rowIndex}: Falta 'turno'.`);
+            if (item.turno !== 'M' && item.turno !== 'T') throw new Error(`Fila ${rowIndex}: 'turno' debe ser M o T.`);
             const rawPrio = item.prioridad !== undefined ? String(item.prioridad).trim().toUpperCase() : 'MEDIA';
             let parsedPriority: 'ALTA' | 'MEDIA' | 'BAJA';
-            if (rawPrio === 'ALTA' || rawPrio === '1' || rawPrio === 'P1') {
-              parsedPriority = 'ALTA';
-            } else if (rawPrio === 'BAJA' || rawPrio === '3' || rawPrio === 'P3') {
-              parsedPriority = 'BAJA';
-            } else {
-              parsedPriority = 'MEDIA';
-            }
+            if (rawPrio === 'ALTA' || rawPrio === '1' || rawPrio === 'P1') parsedPriority = 'ALTA';
+            else if (rawPrio === 'BAJA' || rawPrio === '3' || rawPrio === 'P3') parsedPriority = 'BAJA';
+            else parsedPriority = 'MEDIA';
 
-            if (item.origen === undefined || item.origen.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'origen'.`);
-            if (item.destino === undefined || item.destino.toString() === '') throw new Error(`Error en la fila ${rowIndex} de 'Items': Falta el valor en la columna 'destino'.`);
-            
-            // Type-specific validations
+            const originSlug = resolveStation(item.origen, rowIndex, 'origen');
+            const destSlug = resolveStation(item.destino, rowIndex, 'destino');
+
             if (item.tipo === 'CARGO' && (item.peso === undefined || item.peso.toString() === '' || Number(item.peso) <= 0)) {
-                throw new Error(`Error en la fila ${rowIndex} de 'Items': La carga debe tener un 'peso' mayor a 0.`);
+                throw new Error(`Fila ${rowIndex}: CARGO debe tener un 'peso' mayor a 0.`);
             }
             if (item.tipo === 'PAX' && (item.cantidad === undefined || item.cantidad.toString() === '' || Number(item.cantidad) <= 0)) {
-                throw new Error(`Error en la fila ${rowIndex} de 'Items': PAX debe tener una 'cantidad' mayor a 0.`);
+                throw new Error(`Fila ${rowIndex}: PAX debe tener una 'cantidad' mayor a 0.`);
             }
 
             return {
@@ -292,23 +315,24 @@ export default function Home() {
               shift: item.turno,
               priority: parsedPriority,
               quantity: item.tipo === 'PAX' ? Number(item.cantidad) : 1,
-              originStation: Number(item.origen),
-              destinationStation: Number(item.destino),
+              originStation: originSlug,
+              destinationStation: destSlug,
               weight: item.tipo === 'PAX' ? (scenario.paxDefaultWeight || 80) : Number(item.peso),
               description: item.descripcion || '',
             };
         });
 
-        setScenario({ 
-            numStations: Number(numStations), 
-            helicopterCapacity: Number(helicopterCapacity), 
-            helicopterMaxWeight: Number(helicopterMaxWeight),
-            paxDefaultWeight: scenario.paxDefaultWeight || 80,
-            transportItems, 
-            weatherConditions: '',
-            operationalNotes: '',
-            missionDetails: {},
-        });
+        setScenario(prev => ({ 
+          ...prev,
+          helicopterCapacity: Number(helicopterCapacity),
+          helicopterMaxWeight: Number(helicopterMaxWeight),
+          paxDefaultWeight: prev.paxDefaultWeight || 80,
+          transportItems, 
+          weatherConditions: '',
+          operationalNotes: '',
+          missionDetails: {},
+          refuelConfig: { enabled: refuelEnabled, maxFlightDistance: refuelMaxDist },
+        }));
         toast({ title: 'Éxito', description: 'Datos del escenario importados correctamente.' });
       } catch (error) {
         console.error("Error al importar:", error);
@@ -337,7 +361,6 @@ export default function Home() {
   
   const handleShiftChange = (shift: 'M' | 'T') => {
     setActiveShift(shift);
-    // Try to keep the same plan type but switch shift
     if (selectedPlanId) {
       const base = selectedPlanId.replace(/_[MT]$/, '');
       const newPlanId = `${base}_${shift}`;
@@ -351,9 +374,7 @@ export default function Home() {
       setSelectedPlanId(defaultId);
     } else {
       setSelectedPlanId(null);
-      if (activeView !== 'plans') {
-        setActiveView('plans');
-      }
+      if (activeView !== 'plans') setActiveView('plans');
     }
   }
 
@@ -461,7 +482,7 @@ export default function Home() {
 
                 {activeView === 'plans' && (
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      {/* Compact mission briefing — only when data exists */}
+                      {/* Compact mission briefing */}
                       {scenario.missionDetails && (scenario.missionDetails.pilotInCommand || scenario.missionDetails.aircraftCallsign || scenario.missionDetails.missionObjective) && (
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 px-1">
                             {scenario.missionDetails.aircraftCallsign && (
@@ -490,7 +511,7 @@ export default function Home() {
                         <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-blue-500" /> {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'PAX').length} PAX</span>
                         <span className="flex items-center gap-1.5"><Package className="h-4 w-4 text-amber-500" /> {scenario.transportItems.filter(i => i.shift === activeShift && i.type === 'CARGO').length} Carga</span>
                         <span className="text-muted-foreground/50 hidden sm:inline">·</span>
-                        <span className="hidden sm:inline">PAX/Carga separados · P1→P2→P3</span>
+                        <span className="hidden sm:inline">PAX/Carga separados · ALTA→MEDIA→BAJA</span>
                       </div>
 
                       <div className="max-w-7xl mx-auto px-0">
@@ -548,20 +569,21 @@ export default function Home() {
                   </div>
                 )}
                 
-                {activeView === 'itinerary' && selectedPlan && <FlightItinerary plan={selectedPlan} />}
+                {activeView === 'itinerary' && selectedPlan && (
+                  <FlightItinerary plan={selectedPlan} namesMap={namesMap} />
+                )}
 
                 {activeView === 'map' && selectedPlan && (
                   <div className='grid grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[250px_1fr_280px] gap-4 sm:gap-6 items-start'>
                      <div className="hidden xl:block">
-                       <StationLegend numStations={scenario.numStations} customStations={scenario.customStations} />
+                       <StationLegend stations={scenario.stations} />
                      </div>
                      <div className="col-span-1 lg:col-span-1">
                        <RouteMap 
                           plan={selectedPlan}
-                          numStations={scenario.numStations}
+                          stations={scenario.stations}
                           currentStep={currentMapStep}
                           onStepChange={setCurrentMapStep}
-                          customStations={scenario.customStations}
                           mapBackgroundUrl={scenario.mapBackgroundUrl}
                           onStationDrag={handleStationDrag}
                           onBackgroundUpload={() => {
@@ -573,11 +595,11 @@ export default function Home() {
                       />
                       {/* Station legend below map on mobile/tablet */}
                       <div className="xl:hidden mt-4">
-                        <StationLegend numStations={scenario.numStations} customStations={scenario.customStations} />
+                        <StationLegend stations={scenario.stations} />
                       </div>
                      </div>
                     <div className='flex flex-col gap-4 sm:gap-6'>
-                      <FlightManifest plan={selectedPlan} currentStep={currentMapStep} />
+                      <FlightManifest plan={selectedPlan} currentStep={currentMapStep} namesMap={namesMap} />
                     </div>
                   </div>
                 )}

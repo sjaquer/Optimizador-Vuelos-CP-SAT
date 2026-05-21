@@ -7,11 +7,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { FlightPlan, TransportItem, FlightStep } from '@/lib/types';
 import { PlaneTakeoff, PlaneLanding, User, Waypoints, Package, ArrowRight, FileDown, RotateCw, Route, Gauge, Milestone, Fuel } from 'lucide-react';
 import { Fragment, useMemo } from 'react';
-import { stationNamesMap } from '@/lib/stations';
 import { useToast } from '@/hooks/use-toast';
 
 interface FlightItineraryProps {
   plan: FlightPlan;
+  namesMap?: Record<string, string>;
 }
 
 const actionTranslations: Record<FlightStep['action'], string> = {
@@ -29,10 +29,10 @@ const getFlightNum = (notes: string): number | null => {
   return m ? Number(m[1]) : null;
 };
 
-export function FlightItinerary({ plan }: FlightItineraryProps) {
+export function FlightItinerary({ plan, namesMap = {} }: FlightItineraryProps) {
   const { toast } = useToast();
   
-  const sName = (id: number) => stationNamesMap[id] ?? `E-${id}`;
+  const sName = (id: string) => namesMap[id] ?? id;
 
   const strategy = plan.id.replace(/_[MT]$/, '');
   const shift = plan.id.endsWith('_M') ? 'M' : 'T';
@@ -71,7 +71,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
       doc.setFontSize(9);
       const y0 = 36;
       const metricsArr = [
-        [`Distancia`, `${metrics.totalDistance.toFixed(0)} tramos`],
+        [`Distancia`, `${metrics.totalDistance.toFixed(1)} km`],
         [`Vuelos`, `${metrics.totalFlights}`],
         [`Paradas`, `${metrics.totalStops}`],
         [`PAX entregados`, `${summary.paxCount}`],
@@ -156,7 +156,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
       const summaryData = [
         ['Plan', plan.title],
         ['Turno', shift === 'M' ? 'Mañana' : 'Tarde'],
-        ['Distancia total', `${metrics.totalDistance.toFixed(0)} tramos`],
+        ['Distancia total', `${metrics.totalDistance.toFixed(1)} km`],
         ['Vuelos', `${metrics.totalFlights}`],
         ['Paradas', `${metrics.totalStops}`],
         ['PAX entregados', `${summary.paxCount}`],
@@ -251,7 +251,7 @@ export function FlightItinerary({ plan }: FlightItineraryProps) {
       {/* Metrics summary bar */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {[
-          { icon: <Route className="h-5 w-5" />, label: 'Distancia', value: `${metrics.totalDistance.toFixed(0)}`, unit: 'tramos' },
+          { icon: <Route className="h-5 w-5" />, label: 'Distancia', value: `${metrics.totalDistance.toFixed(1)}`, unit: 'km' },
           { icon: <RotateCw className="h-5 w-5 text-primary" />, label: 'Vuelos', value: `${metrics.totalFlights}`, unit: '' },
           { icon: <Milestone className="h-5 w-5 text-emerald-500" />, label: 'Paradas', value: `${metrics.totalStops}`, unit: '' },
           { icon: <User className="h-5 w-5 text-cyan-500" />, label: 'PAX', value: `${summary.paxCount}`, unit: 'entregados' },

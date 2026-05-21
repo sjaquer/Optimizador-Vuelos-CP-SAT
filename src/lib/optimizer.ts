@@ -1,13 +1,13 @@
 import type { TransportItem, FlightPlan, FlightStep, ScenarioData, StationConfig } from './types';
-import { getDistance, buildNamesMap } from './stations';
+import { getDistance, buildNamesMap, getBaseStation } from './stations';
 
 const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
-// ──── Station label helper (uses customStations when available) ──────
-let _namesMap: Record<number, string> = {};
-const stationLabel = (id: number) => _namesMap[id] ?? `E-${id}`;
+// ──── Station label helper ─────────────────────────────────────────────────
+let _namesMap: Record<string, string> = {};
+const stationLabel = (id: string) => _namesMap[id] ?? id;
 
-// ──── Priority values and cost weights ─────────────────────────────────────────
+// ──── Priority values and cost weights ─────────────────────────────────────
 const PRIORITY_VAL: Record<'ALTA' | 'MEDIA' | 'BAJA', number> = {
   ALTA: 1,
   MEDIA: 2,
@@ -20,65 +20,59 @@ const PRIORITY_COST: Record<'ALTA' | 'MEDIA' | 'BAJA', number> = {
   BAJA: 1,
 };
 
-// ──── FIX #6: Improved scoring — considers total trip cost ──────────
-// Higher priority items with shorter total trips (pickup + delivery) score better.
+// ──── Scoring — considers priority + total trip cost ───────────────────────
 function scoreItem(
   item: TransportItem,
-  currentStation: number,
-  customStations?: StationConfig[],
+  currentStation: string,
+  stations: StationConfig[],
 ): number {
-  const distToOrigin = getDistance(currentStation, item.originStation, customStations);
-  const distOriginToDest = getDistance(item.originStation, item.destinationStation, customStations);
+  const distToOrigin = getDistance(currentStation, item.originStation, stations);
+  const distOriginToDest = getDistance(item.originStation, item.destinationStation, stations);
   const totalTripCost = distToOrigin + distOriginToDest;
   const priorityCost = PRIORITY_COST[item.priority] || 10;
-  // Higher priority (higher cost) + shorter trip = better score
   return priorityCost / Math.max(totalTripCost, 0.5);
 }
 
-// ──── Genuinely different variant strategies ────────────────
+// ──── Variant strategies ───────────────────────────────────────────────────
 
-// Variant 0: Urgent route - ALTA priority first, then MEDIA, then BAJA.
-function sortVariant0(items: TransportItem[], currentStation: number, customStations?: StationConfig[]): TransportItem[] {
+// Variant 0: Urgent — ALTA priority first, then nearest origin
+function sortVariant0(items: TransportItem[], currentStation: string, stations: StationConfig[]): TransportItem[] {
   return [...items].sort((a, b) => {
-    // Priority first
-    if (a.priority !== b.priority) {
-      return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
-    }
-    // Then nearest origin
-    const dA = getDistance(currentStation, a.originStation, customStations);
-    const dB = getDistance(currentStation, b.originStation, customStations);
+    if (a.priority !== b.priority) return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
+    const dA = getDistance(currentStation, a.originStation, stations);
+    const dB = getDistance(currentStation, b.originStation, stations);
     return dA - dB;
   });
 }
 
-// Variant 1: Consolidated route - group items by origin and destination pairs so they are consolidated
-function sortVariant1(items: TransportItem[], customStations?: StationConfig[]): TransportItem[] {
+// Variant 1: Consolidated — group by origin+destination pairs, prioritize by total weight
+function sortVariant1(items: TransportItem[], stations: StationConfig[]): TransportItem[] {
   return [...items].sort((a, b) => {
-    // Group by origin first
-    if (a.originStation !== b.originStation) return a.originStation - b.originStation;
-    // Then destination
-    if (a.destinationStation !== b.destinationStation) return a.destinationStation - b.destinationStation;
-    // Tie-break by priority
+    if (a.originStation !== b.originStation) {
+      // Sort by origin name for stable grouping
+      return a.originStation.localeCompare(b.originStation);
+    }
+    if (a.destinationStation !== b.destinationStation) {
+      return a.destinationStation.localeCompare(b.destinationStation);
+    }
     return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
   });
 }
 
-// Variant 2: Cluster/Zone based route - segment destinations into 3 regions (near, medium, far)
-function sortVariant2(items: TransportItem[], customStations?: StationConfig[]): TransportItem[] {
-  const maxDist = Math.max(...items.map(i => getDistance(0, i.destinationStation, customStations)), 1);
-  const zoneOf = (station: number) => {
-    const d = getDistance(0, station, customStations);
-    const z = Math.floor(d / maxDist * 3);
-    return Math.min(z, 2);
+// Variant 2: Zone-based — segment into 3 radial zones from base, clear each zone in order
+function sortVariant2(items: TransportItem[], baseId: string, stations: StationConfig[]): TransportItem[] {
+  const maxDist = Math.max(...items.map(i => getDistance(baseId, i.destinationStation, stations)), 1);
+  const zoneOf = (stationId: string) => {
+    const d = getDistance(baseId, stationId, stations);
+    return Math.min(Math.floor((d / maxDist) * 3), 2);
   };
-
   return [...items].sort((a, b) => {
     const zA = zoneOf(a.destinationStation);
     const zB = zoneOf(b.destinationStation);
-    if (zA !== zB) return zA - zB; // serve nearest zone first
-    // Within zone, group by destination
-    if (a.destinationStation !== b.destinationStation) return a.destinationStation - b.destinationStation;
-    // Then priority
+    if (zA !== zB) return zA - zB;
+    if (a.destinationStation !== b.destinationStation) {
+      return a.destinationStation.localeCompare(b.destinationStation);
+    }
     return PRIORITY_VAL[a.priority] - PRIORITY_VAL[b.priority];
   });
 }
@@ -86,17 +80,18 @@ function sortVariant2(items: TransportItem[], customStations?: StationConfig[]):
 function groupByVariant(
   items: TransportItem[],
   variant: number,
-  currentStation: number,
-  customStations?: StationConfig[],
+  currentStation: string,
+  baseId: string,
+  stations: StationConfig[],
 ): TransportItem[] {
   switch (variant) {
-    case 1: return sortVariant1(items, customStations);
-    case 2: return sortVariant2(items, customStations);
-    default: return sortVariant0(items, currentStation, customStations);
+    case 1: return sortVariant1(items, stations);
+    case 2: return sortVariant2(items, baseId, stations);
+    default: return sortVariant0(items, currentStation, stations);
   }
 }
 
-// ──── Core: build route for a type (PAX or CARGO) ───────────────────
+// ──── Core: build route for one transport type (PAX or CARGO) ─────────────
 function buildTypeRoute(
   allItems: TransportItem[],
   scenario: ScenarioData,
@@ -104,20 +99,20 @@ function buildTypeRoute(
 ): { steps: FlightStep[]; totalDist: number; notDelivered: TransportItem[]; flightCount: number; refuelStops: number } {
   if (allItems.length === 0) return { steps: [], totalDist: 0, notDelivered: [], flightCount: 0, refuelStops: 0 };
 
-  const cs = scenario.customStations;
-  const pending = groupByVariant(allItems, variant, 0, cs);
+  const stations = scenario.stations;
+  const baseId = getBaseStation(stations).id;
+  const pending = groupByVariant(allItems, variant, baseId, baseId, stations);
   let helicopter: TransportItem[] = [];
   const steps: FlightStep[] = [];
-  let currentStation = 0;
+  let currentStation = baseId;
   let totalDist = 0;
   let flightNum = 0;
   let needsNewFlight = true;
   let refuelStops = 0;
 
-  // FIX #8: Refuel tracking
   const refuelEnabled = scenario.refuelConfig?.enabled === true;
   const maxFlightDist = scenario.refuelConfig?.maxFlightDistance ?? Infinity;
-  let distSinceBase = 0; // cumulative distance since last departure from base
+  let distSinceBase = 0;
 
   const weight = () => helicopter.reduce((s, i) => s + i.weight, 0);
   const typeShort = allItems[0].type;
@@ -137,35 +132,31 @@ function buildTypeRoute(
     return `${helicopter.length} carga(s) a bordo (${w} kg)`;
   };
 
-  // Helper: can we fit this item?
-  // FIX #4: CARGO items only check weight, not seat capacity
   const canFit = (item: TransportItem): boolean => {
     if (weight() + item.weight > scenario.helicopterMaxWeight) return false;
     if (isPax && helicopter.length + 1 > scenario.helicopterCapacity) return false;
     return true;
   };
 
-  // FIX #8: Insert refuel step if needed before travelling a given distance
   const maybeRefuel = (legDist: number): void => {
     if (!refuelEnabled) return;
-    if (distSinceBase + legDist > maxFlightDist && currentStation !== 0) {
-      // Need to return to base to refuel first
-      const returnDist = getDistance(currentStation, 0, cs);
+    if (distSinceBase + legDist > maxFlightDist && currentStation !== baseId) {
+      const returnDist = getDistance(currentStation, baseId, stations);
       totalDist += returnDist;
       distSinceBase += returnDist;
       steps.push({
         action: 'TRAVEL',
-        station: 0,
+        station: baseId,
         items: deepCopy(helicopter),
         legType: helicopter.length > 0 ? legType : 'EMPTY',
-        notes: `[Vuelo #${flightNum}] ⛽ Retorno a Base para reabastecimiento desde ${stationLabel(currentStation)} (${returnDist} tramos)`,
+        notes: `[Vuelo #${flightNum}] ⛽ Retorno a Base para reabastecimiento desde ${stationLabel(currentStation)} (${returnDist} km)`,
       });
-      currentStation = 0;
+      currentStation = baseId;
       steps.push({
         action: 'REFUEL',
-        station: 0,
+        station: baseId,
         items: [],
-        notes: `[Vuelo #${flightNum}] ⛽ Reabastecimiento de combustible en ${stationLabel(0)}`,
+        notes: `[Vuelo #${flightNum}] ⛽ Reabastecimiento de combustible en ${stationLabel(baseId)}`,
       });
       refuelStops++;
       distSinceBase = 0;
@@ -178,10 +169,10 @@ function buildTypeRoute(
   while ((pending.length > 0 || helicopter.length > 0) && iter < MAX_ITERATIONS) {
     iter++;
 
-    if (currentStation === 0 && needsNewFlight && (pending.length > 0 || helicopter.length > 0)) {
+    if (currentStation === baseId && needsNewFlight && (pending.length > 0 || helicopter.length > 0)) {
       flightNum++;
       needsNewFlight = false;
-      distSinceBase = 0; // reset on new flight from base
+      distSinceBase = 0;
     }
 
     // ── DROPOFF ──
@@ -212,7 +203,7 @@ function buildTypeRoute(
     }
 
     if (pickedUp.length > 0) {
-      const isBase = currentStation === 0;
+      const isBase = currentStation === baseId;
       steps.push({
         action: 'PICKUP',
         station: currentStation,
@@ -225,62 +216,56 @@ function buildTypeRoute(
     if (pending.length === 0 && helicopter.length === 0) break;
 
     // ── CHOOSE NEXT STATION ──
-    let nextStation = -1;
+    let nextStation = '';
 
     if (helicopter.length > 0) {
-      // Primary: go to nearest dropoff
       const dropoffs = [...new Set(helicopter.map(p => p.destinationStation))];
 
       if (variant === 1) {
-        // Variant 1 (Option B): nearest dropoff (greedy)
         nextStation = dropoffs.sort((a, b) =>
-          getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs)
+          getDistance(currentStation, a, stations) - getDistance(currentStation, b, stations)
         )[0];
       } else if (variant === 2) {
-        // Variant 2 (Option C): Zoned dropoff
-        const maxDest = Math.max(...allItems.map(i => getDistance(0, i.destinationStation, cs)), 1);
-        const zoneOf = (station: number) => {
-          const d = getDistance(0, station, cs);
-          const z = Math.floor(d / maxDest * 3);
-          return Math.min(z, 2);
+        const maxDest = Math.max(...allItems.map(i => getDistance(baseId, i.destinationStation, stations)), 1);
+        const zoneOf = (stId: string) => {
+          const d = getDistance(baseId, stId, stations);
+          return Math.min(Math.floor((d / maxDest) * 3), 2);
         };
         nextStation = dropoffs.sort((a, b) => {
           const zA = zoneOf(a);
           const zB = zoneOf(b);
           if (zA !== zB) return zA - zB;
-          return getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs);
+          return getDistance(currentStation, a, stations) - getDistance(currentStation, b, stations);
         })[0];
       } else {
-        // Variant 0 (Option A): Urgent dropoff
-        // If there are ALTA items on board, go to nearest ALTA dropoff first
+        // Variant 0: ALTA items first
         const altaOnBoard = helicopter.filter(p => p.priority === 'ALTA');
         if (altaOnBoard.length > 0) {
           const altaDropoffs = [...new Set(altaOnBoard.map(p => p.destinationStation))];
           nextStation = altaDropoffs.sort((a, b) =>
-            getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs)
+            getDistance(currentStation, a, stations) - getDistance(currentStation, b, stations)
           )[0];
         } else {
           nextStation = dropoffs.sort((a, b) =>
-            getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs)
+            getDistance(currentStation, a, stations) - getDistance(currentStation, b, stations)
           )[0];
         }
       }
 
-      // FIX #1: POOLING — check intermediate stations for pending pickups along the route
-      if (pending.length > 0 && nextStation !== currentStation) {
-        const routeDist = getDistance(currentStation, nextStation, cs);
-        // Check all stations with pending items
+      // Pooling: check intermediate stations for pending pickups (detour ≤ 5 km)
+      if (pending.length > 0 && nextStation && nextStation !== currentStation) {
+        const routeDist = getDistance(currentStation, nextStation, stations);
         const intermediateOrigins = [...new Set(pending.map(p => p.originStation))].filter(
           s => s !== currentStation && s !== nextStation
         );
         for (const midStation of intermediateOrigins) {
-          const detour = getDistance(currentStation, midStation, cs) + getDistance(midStation, nextStation, cs) - routeDist;
-          if (detour <= 1) {
-            // Check if we have capacity to pick up something there
+          const detour =
+            getDistance(currentStation, midStation, stations) +
+            getDistance(midStation, nextStation, stations) -
+            routeDist;
+          if (detour <= 5) {
             const midItems = pending.filter(p => p.originStation === midStation);
-            const canPickAny = midItems.some(item => canFit(item));
-            if (canPickAny) {
-              // Divert to this intermediate station first
+            if (midItems.some(item => canFit(item))) {
               nextStation = midStation;
               break;
             }
@@ -289,9 +274,9 @@ function buildTypeRoute(
       }
     } else if (pending.length > 0) {
       if (variant === 1) {
-        // Variant 1 (Option B): consolidated - fly to the origin with highest pending payload
+        // Fly to origin with highest pending payload
         const origins = [...new Set(pending.map(p => p.originStation))];
-        let bestStation = -1;
+        let bestStation = '';
         let maxWeight = -1;
         for (const origin of origins) {
           const stationItems = pending.filter(p => p.originStation === origin);
@@ -303,32 +288,28 @@ function buildTypeRoute(
         }
         nextStation = bestStation;
       } else if (variant === 2) {
-        // Variant 2 (Option C): cluster-based — pick the origin whose items belong to the nearest incomplete zone
-        const maxDest = Math.max(...allItems.map(i => getDistance(0, i.destinationStation, cs)), 1);
-        const zoneOf = (station: number) => {
-          const d = getDistance(0, station, cs);
-          const z = Math.floor(d / maxDest * 3);
-          return Math.min(z, 2);
+        const maxDest = Math.max(...allItems.map(i => getDistance(baseId, i.destinationStation, stations)), 1);
+        const zoneOf = (stId: string) => {
+          const d = getDistance(baseId, stId, stations);
+          return Math.min(Math.floor((d / maxDest) * 3), 2);
         };
-
         const pendingZones = pending.map(i => zoneOf(i.destinationStation));
         const minZone = Math.min(...pendingZones);
         const zoneItems = pending.filter(i => zoneOf(i.destinationStation) === minZone);
         const origins = [...new Set(zoneItems.map(p => p.originStation))];
-        // Nearest origin in that zone
-        nextStation = origins.sort((a, b) => getDistance(currentStation, a, cs) - getDistance(currentStation, b, cs))[0];
+        nextStation = origins.sort((a, b) =>
+          getDistance(currentStation, a, stations) - getDistance(currentStation, b, stations)
+        )[0];
       } else {
-        // Variant 0 (Option A): urgent - pick the station that has the highest urgency items
-        // If there are ALTA items pending, only consider their origins
+        // Variant 0: urgent — prioritize ALTA pending
         const altaPending = pending.filter(i => i.priority === 'ALTA');
         const activePending = altaPending.length > 0 ? altaPending : pending;
-
         let bestScore = -1;
-        let bestStation = -1;
+        let bestStation = '';
         const origins = [...new Set(activePending.map(p => p.originStation))];
         for (const origin of origins) {
           const stationItems = activePending.filter(p => p.originStation === origin);
-          const totalScore = stationItems.reduce((sum, item) => sum + scoreItem(item, currentStation, cs), 0);
+          const totalScore = stationItems.reduce((sum, item) => sum + scoreItem(item, currentStation, stations), 0);
           if (totalScore > bestScore) {
             bestScore = totalScore;
             bestStation = origin;
@@ -338,12 +319,10 @@ function buildTypeRoute(
       }
     }
 
-    if (nextStation !== -1 && nextStation !== currentStation) {
-      const legDist = getDistance(currentStation, nextStation, cs);
-      // FIX #8: check refuel before travel
+    if (nextStation && nextStation !== currentStation) {
+      const legDist = getDistance(currentStation, nextStation, stations);
       maybeRefuel(legDist);
-      // Recalculate distance from current position (may have changed due to refuel)
-      const actualDist = getDistance(currentStation, nextStation, cs);
+      const actualDist = getDistance(currentStation, nextStation, stations);
       totalDist += actualDist;
       distSinceBase += actualDist;
       const currentLegType = helicopter.length > 0 ? legType : 'EMPTY' as const;
@@ -352,33 +331,33 @@ function buildTypeRoute(
         station: nextStation,
         items: deepCopy(helicopter),
         legType: currentLegType,
-        notes: `[Vuelo #${flightNum}] ${stationLabel(currentStation)} → ${stationLabel(nextStation)} (${actualDist} tramos) · ${onboardSummary()}`,
+        notes: `[Vuelo #${flightNum}] ${stationLabel(currentStation)} → ${stationLabel(nextStation)} (${actualDist} km) · ${onboardSummary()}`,
       });
       currentStation = nextStation;
-    } else if (helicopter.length > 0 && currentStation !== 0) {
-      const legDist = getDistance(currentStation, 0, cs);
+    } else if (helicopter.length > 0 && currentStation !== baseId) {
+      const legDist = getDistance(currentStation, baseId, stations);
       maybeRefuel(legDist);
-      const actualDist = getDistance(currentStation, 0, cs);
+      const actualDist = getDistance(currentStation, baseId, stations);
       totalDist += actualDist;
       distSinceBase += actualDist;
       steps.push({
-        action: 'TRAVEL', station: 0, items: deepCopy(helicopter),
+        action: 'TRAVEL', station: baseId, items: deepCopy(helicopter),
         legType,
-        notes: `[Vuelo #${flightNum}] Regresando a Base desde ${stationLabel(currentStation)} (${actualDist} tramos) · ${onboardSummary()}`,
+        notes: `[Vuelo #${flightNum}] Regresando a Base desde ${stationLabel(currentStation)} (${actualDist} km) · ${onboardSummary()}`,
       });
-      currentStation = 0;
-    } else if (helicopter.length === 0 && pending.length > 0 && currentStation !== 0) {
-      const legDist = getDistance(currentStation, 0, cs);
+      currentStation = baseId;
+    } else if (helicopter.length === 0 && pending.length > 0 && currentStation !== baseId) {
+      const legDist = getDistance(currentStation, baseId, stations);
       maybeRefuel(legDist);
-      const actualDist = getDistance(currentStation, 0, cs);
+      const actualDist = getDistance(currentStation, baseId, stations);
       totalDist += actualDist;
       distSinceBase += actualDist;
       steps.push({
-        action: 'TRAVEL', station: 0, items: [],
+        action: 'TRAVEL', station: baseId, items: [],
         legType: 'EMPTY',
-        notes: `[Vuelo #${flightNum}] Regreso a Base desde ${stationLabel(currentStation)} para nuevo vuelo (${actualDist} tramos) · vacío`,
+        notes: `[Vuelo #${flightNum}] Regreso a Base desde ${stationLabel(currentStation)} para nuevo vuelo (${actualDist} km) · vacío`,
       });
-      currentStation = 0;
+      currentStation = baseId;
       needsNewFlight = true;
     } else {
       break;
@@ -386,36 +365,34 @@ function buildTypeRoute(
   }
 
   // Final return to base
-  if (currentStation !== 0 && steps.length > 0) {
-    const legDist = getDistance(currentStation, 0, cs);
+  if (currentStation !== baseId && steps.length > 0) {
+    const legDist = getDistance(currentStation, baseId, stations);
     maybeRefuel(legDist);
-    const actualDist = getDistance(currentStation, 0, cs);
+    const actualDist = getDistance(currentStation, baseId, stations);
     totalDist += actualDist;
     steps.push({
-      action: 'TRAVEL', station: 0, items: [],
+      action: 'TRAVEL', station: baseId, items: [],
       legType: 'EMPTY',
-      notes: `[Vuelo #${flightNum}] Regreso final a ${stationLabel(0)}.`,
+      notes: `[Vuelo #${flightNum}] Regreso final a ${stationLabel(baseId)}.`,
     });
   }
 
-  // FIX #5: flight count based on flightNum counter
   return { steps, totalDist, notDelivered: [...pending], flightCount: flightNum, refuelStops };
 }
 
-// ──── Build complete route: PAX + CARGO separated ───────────────────
+// ──── Build complete route: PAX + CARGO separated ─────────────────────────
 function buildRoute(
   allItems: TransportItem[],
   scenario: ScenarioData,
   variant: number = 0,
 ): { steps: FlightStep[]; totalDistanceUnits: number; notDelivered: TransportItem[]; totalFlights: number; refuelStops: number } {
-  const cs = scenario.customStations;
+  const stations = scenario.stations;
+  const baseId = getBaseStation(stations).id;
   const paxItems = allItems.filter(i => i.type === 'PAX');
   const cargoItems = allItems.filter(i => i.type === 'CARGO');
 
-  // Determine type order: prioritize the type with highest-urgency items
   let typeOrder: ('PAX' | 'CARGO')[];
   if (variant === 1) {
-    // Variant 1: CARGO first (farthest destinations often cargo)
     typeOrder = ['CARGO', 'PAX'];
   } else {
     const bestPax = paxItems.length > 0 ? Math.min(...paxItems.map(i => PRIORITY_VAL[i.priority])) : Infinity;
@@ -433,14 +410,13 @@ function buildRoute(
     const items = type === 'PAX' ? paxItems : cargoItems;
     if (items.length === 0) continue;
 
-    // Ensure we start from base between type switches
     if (allSteps.length > 0) {
       const lastStep = allSteps[allSteps.length - 1];
-      if (lastStep.station !== 0) {
-        const legDist = getDistance(lastStep.station, 0, cs);
+      if (lastStep.station !== baseId) {
+        const legDist = getDistance(lastStep.station, baseId, stations);
         totalDist += legDist;
         allSteps.push({
-          action: 'TRAVEL', station: 0, items: [],
+          action: 'TRAVEL', station: baseId, items: [],
           legType: 'EMPTY',
           notes: `Regreso a Base para iniciar vuelos de ${type === 'PAX' ? 'Pasajeros' : 'Carga'} · vacío`,
         });
@@ -458,7 +434,7 @@ function buildRoute(
   return { steps: allSteps, totalDistanceUnits: totalDist, notDelivered: allNotDelivered, totalFlights, refuelStops: totalRefuelStops };
 }
 
-// ──── Metrics computation ───────────────────────────────────────────
+// ──── Metrics ─────────────────────────────────────────────────────────────
 function computeMetrics(
   steps: FlightStep[],
   totalDistanceUnits: number,
@@ -486,22 +462,20 @@ function computeMetrics(
 
   return {
     totalStops: stopsSet.size,
-    totalDistance: totalDistanceUnits,
+    totalDistance: Math.round(totalDistanceUnits * 10) / 10,
     totalLegs: travelSteps.length,
     itemsTransported: itemsDelivered,
     itemsNotDelivered: notDelivered.length,
     totalWeight,
     maxWeightRatio,
     avgLoadRatio,
-    // FIX #5: use flightNum counter instead of base departure tracking
     totalFlights: Math.max(totalFlights, steps.length > 0 ? 1 : 0),
-    // FIX #8: new metrics
     refuelStops,
     impossibleItems,
   };
 }
 
-// ──── Public API ────────────────────────────────────────────────────
+// ──── Public API ──────────────────────────────────────────────────────────
 const VARIANT_LABELS: Record<number, string> = {
   0: 'Opción A: Ruta Urgente',
   1: 'Opción B: Ruta Consolidada',
@@ -514,10 +488,10 @@ export function runFlightOptimization(
   shift: 'M' | 'T',
   variant: number = 0,
 ): FlightPlan {
-  const cs = scenario.customStations;
+  const stations = scenario.stations;
 
   // Initialize namesMap for stationLabel helper
-  _namesMap = buildNamesMap(cs);
+  _namesMap = buildNamesMap(stations);
 
   const emptyMetrics: FlightPlan['metrics'] = {
     totalStops: 0, totalDistance: 0, totalLegs: 0,
@@ -531,16 +505,10 @@ export function runFlightOptimization(
   const planTitle = `${label} — Turno ${shift === 'M' ? 'Mañana' : 'Tarde'}`;
 
   if (itemsToTransport.length === 0) {
-    return {
-      id: planId,
-      title: planTitle,
-      description: 'Sin requerimientos para este turno.',
-      steps: [],
-      metrics: emptyMetrics,
-    };
+    return { id: planId, title: planTitle, description: 'Sin requerimientos para este turno.', steps: [], metrics: emptyMetrics };
   }
 
-  // FIX #3: Preserve original description when expanding PAX
+  // Expand PAX quantity > 1
   const expandedItems: TransportItem[] = deepCopy(itemsToTransport).flatMap((item: TransportItem) => {
     if (item.type === 'PAX' && item.quantity > 1) {
       return Array.from({ length: item.quantity }, (_, i) => ({
@@ -555,7 +523,7 @@ export function runFlightOptimization(
     return [item];
   });
 
-  // FIX #2: Filter out impossible items (individual weight > helicopterMaxWeight)
+  // Filter impossible items
   const impossibleItems: TransportItem[] = [];
   const feasibleItems: TransportItem[] = [];
   for (const item of expandedItems) {
@@ -566,10 +534,8 @@ export function runFlightOptimization(
     }
   }
 
-  // Build route with feasible items only
   const { steps, totalDistanceUnits, notDelivered, totalFlights, refuelStops } = buildRoute(feasibleItems, scenario, variant);
 
-  // Impossible items go to notDelivered with a message
   const impossibleAsNotDelivered = impossibleItems.map(item => ({
     ...item,
     description: `⚠ IMPOSIBLE: peso (${item.weight} kg) excede capacidad máxima (${scenario.helicopterMaxWeight} kg). ${item.description || ''}`.trim(),

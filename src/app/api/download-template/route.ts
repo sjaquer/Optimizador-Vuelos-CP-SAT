@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ALL_STATIONS } from '@/lib/stations';
+import { DEFAULT_STATIONS } from '@/lib/stations';
 
 export const runtime = 'nodejs';
 
@@ -27,20 +27,19 @@ export async function GET() {
 
   const wsConfig = workbook.addWorksheet('Configuracion', { properties: { tabColor: { argb: 'FF' + BRAND } } });
   wsConfig.columns = [
-    { header: 'Clave', key: 'Clave', width: 28 },
-    { header: 'Valor', key: 'Valor', width: 18 },
-    { header: 'Descripción', key: 'Descripcion', width: 52 },
+    { header: 'Clave', key: 'Clave', width: 30 },
+    { header: 'Valor', key: 'Valor', width: 20 },
+    { header: 'Descripción', key: 'Descripcion', width: 55 },
   ];
   const cfgHeader = wsConfig.getRow(1);
   cfgHeader.eachCell(c => { c.fill = HEADER_FILL; c.font = HEADER_FONT; c.border = CELL_BORDER; c.alignment = { vertical: 'middle' }; });
   cfgHeader.height = 28;
 
   [
-    { Clave: 'numStations', Valor: 8, Descripcion: 'Número de estaciones activas (sin contar la Base). Máx: ' + (ALL_STATIONS.length - 1) },
     { Clave: 'helicopterCapacity', Valor: 4, Descripcion: 'Asientos disponibles en el helicóptero (sin contar tripulación)' },
     { Clave: 'helicopterMaxWeight', Valor: 500, Descripcion: 'Peso máximo de carga útil en kilogramos' },
     { Clave: 'refuelEnabled', Valor: 'FALSE', Descripcion: 'Activar sistema de reabastecimiento de combustible (TRUE / FALSE)' },
-    { Clave: 'refuelMaxFlightDistance', Valor: 10, Descripcion: 'Distancia máxima de vuelo (en unidades) antes de necesitar reabastecimiento' },
+    { Clave: 'refuelMaxFlightDistance', Valor: 80, Descripcion: 'Autonomía máxima en km antes de regresar a base para reabastecerse' },
   ].forEach((row, i) => {
     const rowItem = wsConfig.addRow(row);
     rowItem.eachCell(c => { c.border = CELL_BORDER; c.alignment = { vertical: 'middle', wrapText: true }; });
@@ -60,14 +59,18 @@ export async function GET() {
   wsConfig.mergeCells(`A${stTitle.number}:C${stTitle.number}`);
   stTitle.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF' + BRAND } };
 
-  const stHeader = wsConfig.addRow({ Clave: 'ID', Valor: 'Nombre de Estación' });
+  // Station table header: Nombre | ID (Slug) | X (km) | Y (km) | Base?
+  const stHeader = wsConfig.addRow({ Clave: 'Nombre de Estación', Valor: 'ID (Slug)', Descripcion: 'Coordenadas' });
   stHeader.eachCell(c => { c.fill = HEADER_FILL; c.font = HEADER_FONT; c.border = CELL_BORDER; });
 
-  ALL_STATIONS.forEach((station, index) => {
-    const rowItem = wsConfig.addRow({ Clave: station.id, Valor: station.name });
+  DEFAULT_STATIONS.forEach((station, index) => {
+    const desc = station.isBase
+      ? `BASE — Origen 0,0 km · Usar en origen o destino como "${station.name}"`
+      : `X: ${station.x > 0 ? '+' : ''}${station.x} km · Y: ${station.y > 0 ? '+' : ''}${station.y} km · Dist. base ≈ ${Math.round(Math.sqrt(station.x * station.x + station.y * station.y))} km`;
+    const rowItem = wsConfig.addRow({ Clave: station.name, Valor: station.id, Descripcion: desc });
     rowItem.eachCell(c => { c.border = CELL_BORDER; c.alignment = { vertical: 'middle' }; });
     if (index % 2 === 1) rowItem.eachCell(c => { c.fill = ALT_ROW; });
-    if (station.id === 0) rowItem.getCell(2).font = { bold: true, color: { argb: 'FF' + BRAND } };
+    if (station.isBase) rowItem.getCell(1).font = { bold: true, color: { argb: 'FF' + BRAND } };
   });
 
   const wsItems = workbook.addWorksheet('Items', { properties: { tabColor: { argb: 'FF2E7D32' } } });
@@ -77,8 +80,8 @@ export async function GET() {
     { header: 'turno', key: 'turno', width: 10 },
     { header: 'prioridad', key: 'prioridad', width: 12 },
     { header: 'cantidad', key: 'cantidad', width: 12 },
-    { header: 'origen', key: 'origen', width: 10 },
-    { header: 'destino', key: 'destino', width: 10 },
+    { header: 'origen', key: 'origen', width: 22 },
+    { header: 'destino', key: 'destino', width: 22 },
     { header: 'peso', key: 'peso', width: 12 },
     { header: 'descripcion', key: 'descripcion', width: 36 },
   ];
@@ -87,15 +90,18 @@ export async function GET() {
   itmHeader.eachCell(c => { c.fill = HEADER_FILL; c.font = HEADER_FONT; c.border = CELL_BORDER; c.alignment = { vertical: 'middle' }; });
   itmHeader.height = 28;
 
+  const base = DEFAULT_STATIONS.find(s => s.isBase)!;
+  const nonBase = DEFAULT_STATIONS.filter(s => !s.isBase);
+
   [
-    { area: 'Perforación', tipo: 'PAX', turno: 'M', prioridad: 'ALTA', cantidad: 3, origen: 0, destino: 2, peso: '', descripcion: '' },
-    { area: 'Geología', tipo: 'PAX', turno: 'M', prioridad: 'MEDIA', cantidad: 2, origen: 0, destino: 4, peso: '', descripcion: '' },
-    { area: 'Logística', tipo: 'CARGO', turno: 'M', prioridad: 'ALTA', cantidad: 1, origen: 0, destino: 3, peso: 120, descripcion: 'Tubería HDD 6"' },
-    { area: 'Mantenimiento', tipo: 'PAX', turno: 'T', prioridad: 'MEDIA', cantidad: 1, origen: 3, destino: 0, peso: '', descripcion: '' },
-    { area: 'Medio Ambiente', tipo: 'PAX', turno: 'M', prioridad: 'BAJA', cantidad: 2, origen: 0, destino: 7, peso: '', descripcion: '' },
-    { area: 'Obras Civiles', tipo: 'CARGO', turno: 'T', prioridad: 'MEDIA', cantidad: 1, origen: 0, destino: 6, peso: 200, descripcion: 'Cemento y herramientas' },
-    { area: 'Seguridad', tipo: 'PAX', turno: 'T', prioridad: 'ALTA', cantidad: 4, origen: 2, destino: 0, peso: '', descripcion: '' },
-    { area: 'Campamento', tipo: 'CARGO', turno: 'M', prioridad: 'BAJA', cantidad: 1, origen: 0, destino: 5, peso: 85, descripcion: 'Víveres y agua' },
+    { area: 'Perforación', tipo: 'PAX', turno: 'M', prioridad: 'ALTA', cantidad: 3, origen: base.name, destino: nonBase[1].name, peso: '', descripcion: '' },
+    { area: 'Geología', tipo: 'PAX', turno: 'M', prioridad: 'MEDIA', cantidad: 2, origen: base.name, destino: nonBase[3].name, peso: '', descripcion: '' },
+    { area: 'Logística', tipo: 'CARGO', turno: 'M', prioridad: 'ALTA', cantidad: 1, origen: base.name, destino: nonBase[2].name, peso: 120, descripcion: 'Tubería HDD 6"' },
+    { area: 'Mantenimiento', tipo: 'PAX', turno: 'T', prioridad: 'MEDIA', cantidad: 1, origen: nonBase[2].name, destino: base.name, peso: '', descripcion: '' },
+    { area: 'Medio Ambiente', tipo: 'PAX', turno: 'M', prioridad: 'BAJA', cantidad: 2, origen: base.name, destino: nonBase[6].name, peso: '', descripcion: '' },
+    { area: 'Obras Civiles', tipo: 'CARGO', turno: 'T', prioridad: 'MEDIA', cantidad: 1, origen: base.name, destino: nonBase[5].name, peso: 200, descripcion: 'Cemento y herramientas' },
+    { area: 'Seguridad', tipo: 'PAX', turno: 'T', prioridad: 'ALTA', cantidad: 4, origen: nonBase[1].name, destino: base.name, peso: '', descripcion: '' },
+    { area: 'Campamento', tipo: 'CARGO', turno: 'M', prioridad: 'BAJA', cantidad: 1, origen: base.name, destino: nonBase[4].name, peso: 85, descripcion: 'Víveres y agua' },
   ].forEach(row => {
     const rowItem = wsItems.addRow(row);
     const fill = row.tipo === 'PAX' ? PAX_FILL : CARGO_FILL;
@@ -110,10 +116,11 @@ export async function GET() {
     '• "turno": M = Mañana, T = Tarde. Los turnos no se mezclan.',
     '• "prioridad": ALTA (Máxima urgencia), MEDIA (Estándar), BAJA (Baja prioridad).',
     '• "cantidad": Solo para PAX, indicar número de personas.',
-    '• "origen" / "destino": ID de estación (ver hoja Configuracion). 0 = Base.',
+    '• "origen" / "destino": Nombre completo de la estación (ej: "BO Nuevo Mundo"). Ver tabla en hoja Configuracion.',
     '• "peso": Solo para CARGO, peso en kg. PAX usa peso estándar configurado.',
     '• "descripcion": Opcional. Detalle de la carga.',
     '',
+    '💡 También se puede escribir el ID (slug) de la estación (ej: "bo-nuevo-mundo") en origen/destino.',
     '💡 Las filas de ejemplo arriba pueden ser eliminadas o reemplazadas con datos reales.',
   ].forEach(text => {
     const rowItem = wsItems.addRow({ area: text });
