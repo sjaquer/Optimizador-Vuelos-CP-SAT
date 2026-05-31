@@ -3,81 +3,79 @@
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 @layer base {
   :root {
-      /* Palette: Repsol-style orange + bone white light / near-black dark
-         Light mode uses off-white ('hueso') background and dark gray text.
-         Primary is Repsol orange. Dark mode flips background/foreground. */
-      --background: 38 8% 96%; /* off-white / bone */
-      --foreground: 220 6% 12%; /* dark gray / near-black for text */
-      --card: 38 8% 100%;
-      --card-foreground: 220 6% 12%;
-      --popover: 38 8% 100%;
-      --popover-foreground: 220 6% 12%;
-      --primary: 24 100% 50%; /* Repsol orange */
-      --primary-foreground: 0 0% 100%; /* white for contrast */
-      --secondary: 30 95% 92%; /* soft warm accent */
-      --secondary-foreground: 220 6% 12%;
-      --muted: 210 6% 96%; /* subtle gray */
-      --muted-foreground: 220 6% 40%;
-      --accent: 24 100% 56%;
-      --accent-foreground: 0 0% 100%;
-      --destructive: 0 84.2% 60.2%;
-      --destructive-foreground: 0 0% 100%;
-      --border: 220 6% 88%;
-      --input: 220 6% 94%;
-      --ring: 24 100% 50%;
-      --chart-1: 24 100% 50%; /* primary orange */
-      --chart-2: 28 95% 45%;  /* deep orange */
-      --chart-3: 210 6% 30%;  /* dark gray accent */
-      --chart-4: 24 100% 65%;  /* lighter orange */
-      --chart-5: 38 8% 60%;   /* bone / beige */
-      --radius: 0.75rem;
-      --sidebar-background: 38 8% 100%;
-      --sidebar-foreground: 220 6% 12%;
-      --sidebar-primary: 24 100% 50%;
-      --sidebar-primary-foreground: 0 0% 100%;
-      --sidebar-accent: 30 95% 92%;
-      --sidebar-accent-foreground: 220 6% 12%;
-      --sidebar-border: 220 6% 88%;
-      --sidebar-ring: 24 100% 50%;
-  }
-    .dark {
-      /* Dark mode: near-black background, bone/off-white foreground, same orange accents */
-      --background: 220 6% 8%; /* near-black */
-      --foreground: 38 8% 96%; /* bone / off-white */
-      --card: 220 6% 10%;
-      --card-foreground: 38 8% 96%;
-      --popover: 220 6% 8%;
-      --popover-foreground: 38 8% 96%;
-      --primary: 24 100% 50%;
+      /* Light mode: refined off-white/bone with warm accents */
+      --background: 40 12% 97%;       /* warm off-white */
+      --foreground: 222 47% 11%;      /* deep navy text */
+      --card: 0 0% 100%;
+      --card-foreground: 222 47% 11%;
+      --popover: 0 0% 100%;
+      --popover-foreground: 222 47% 11%;
+      --primary: 24 100% 50%;         /* Repsol orange — brand identity */
       --primary-foreground: 0 0% 100%;
-      --secondary: 28 95% 22%;
-      --secondary-foreground: 38 8% 96%;
-      --muted: 220 6% 12%;
-      --muted-foreground: 38 8% 96%;
+      --secondary: 30 95% 93%;        /* soft warm peach */
+      --secondary-foreground: 222 47% 11%;
+      --muted: 220 14% 96%;
+      --muted-foreground: 220 9% 46%;
       --accent: 24 100% 56%;
       --accent-foreground: 0 0% 100%;
-      --destructive: 0 62.8% 30.6%;
-      --destructive-foreground: 38 8% 96%;
-      --border: 220 6% 14%;
-      --input: 220 6% 12%;
+      --destructive: 0 84% 60%;
+      --destructive-foreground: 0 0% 100%;
+      --border: 220 13% 91%;
+      --input: 220 13% 91%;
       --ring: 24 100% 50%;
       --chart-1: 24 100% 50%;
       --chart-2: 28 95% 45%;
-      --chart-3: 220 6% 30%;
+      --chart-3: 210 6% 30%;
       --chart-4: 24 100% 65%;
-      --chart-5: 38 8% 20%;
-      --sidebar-background: 220 6% 10%;
-      --sidebar-foreground: 38 8% 96%;
+      --chart-5: 38 8% 60%;
+      --radius: 0.75rem;
+      --sidebar-background: 0 0% 100%;
+      --sidebar-foreground: 222 47% 11%;
       --sidebar-primary: 24 100% 50%;
       --sidebar-primary-foreground: 0 0% 100%;
-      --sidebar-accent: 28 95% 22%;
-      --sidebar-accent-foreground: 38 8% 96%;
-      --sidebar-border: 220 6% 14%;
+      --sidebar-accent: 30 95% 93%;
+      --sidebar-accent-foreground: 222 47% 11%;
+      --sidebar-border: 220 13% 91%;
+      --sidebar-ring: 24 100% 50%;
+  }
+    .dark {
+      /* Dark mode: deep navy/obsidian mission-control aesthetic */
+      --background: 222 47% 6%;        /* deep obsidian navy */
+      --foreground: 213 31% 91%;       /* silver-white text */
+      --card: 222 41% 9%;              /* blue-gray card surface */
+      --card-foreground: 213 31% 91%;
+      --popover: 222 41% 9%;
+      --popover-foreground: 213 31% 91%;
+      --primary: 24 100% 50%;          /* Repsol orange — consistent brand */
+      --primary-foreground: 0 0% 100%;
+      --secondary: 222 30% 14%;        /* muted navy accent */
+      --secondary-foreground: 213 31% 91%;
+      --muted: 222 30% 12%;
+      --muted-foreground: 215 20% 55%;
+      --accent: 24 100% 56%;
+      --accent-foreground: 0 0% 100%;
+      --destructive: 0 63% 31%;
+      --destructive-foreground: 213 31% 91%;
+      --border: 222 30% 14%;          /* subtle glass borders */
+      --input: 222 30% 12%;
+      --ring: 24 100% 50%;
+      --chart-1: 24 100% 50%;
+      --chart-2: 28 95% 45%;
+      --chart-3: 215 20% 55%;
+      --chart-4: 24 100% 65%;
+      --chart-5: 222 30% 20%;
+      --sidebar-background: 222 41% 8%;
+      --sidebar-foreground: 213 31% 91%;
+      --sidebar-primary: 24 100% 50%;
+      --sidebar-primary-foreground: 0 0% 100%;
+      --sidebar-accent: 222 30% 14%;
+      --sidebar-accent-foreground: 213 31% 91%;
+      --sidebar-border: 222 30% 14%;
       --sidebar-ring: 24 100% 50%;
     }
 }
@@ -92,6 +90,40 @@ body {
 }
 
 @layer utilities {
+  /* ─── Glassmorphism utilities ─── */
+  .glass-card {
+    @apply bg-card/60 backdrop-blur-xl border border-white/[0.06] shadow-lg;
+  }
+  .dark .glass-card {
+    background: hsla(222, 41%, 9%, 0.65);
+    border-color: hsla(215, 20%, 55%, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  .glass-border {
+    @apply border border-white/[0.08];
+  }
+  .dark .glass-border {
+    border-color: hsla(215, 20%, 55%, 0.1);
+  }
+
+  /* ─── Glow utilities ─── */
+  .glow-primary {
+    box-shadow: 0 0 20px hsla(24, 100%, 50%, 0.25), 0 0 40px hsla(24, 100%, 50%, 0.1);
+  }
+  .glow-blue {
+    box-shadow: 0 0 20px hsla(210, 100%, 50%, 0.2), 0 0 40px hsla(210, 100%, 50%, 0.08);
+  }
+  .glow-amber {
+    box-shadow: 0 0 20px hsla(38, 100%, 50%, 0.2), 0 0 40px hsla(38, 100%, 50%, 0.08);
+  }
+
+  /* ─── Neon flight-path line animation ─── */
+  .neon-line {
+    stroke: hsl(24, 100%, 50%);
+    filter: drop-shadow(0 0 4px hsla(24, 100%, 50%, 0.6)) drop-shadow(0 0 8px hsla(24, 100%, 50%, 0.3));
+  }
+
+  /* ─── Existing keyframes (preserved) ─── */
   @keyframes draw-line {
     to {
       stroke-dashoffset: 0;
@@ -129,5 +161,88 @@ body {
   }
   .animate-manifest-item-in {
     animation: manifest-item-in 0.5s ease-out forwards;
+  }
+
+  /* ─── New keyframes ─── */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-up {
+    animation: fade-up 0.5s ease-out forwards;
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .animate-slide-in {
+    animation: slide-in 0.4s ease-out forwards;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 8px hsla(24, 100%, 50%, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 24px hsla(24, 100%, 50%, 0.5), 0 0 48px hsla(24, 100%, 50%, 0.2);
+    }
+  }
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes flow-dash {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+  .animate-flow-dash {
+    stroke-dasharray: 8 6;
+    animation: flow-dash 1s linear infinite;
+  }
+
+  /* ─── Animated grid background for login ─── */
+  @keyframes grid-move {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(40px, 40px); }
+  }
+  .animated-grid {
+    background-image: 
+      linear-gradient(hsla(215, 20%, 55%, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsla(215, 20%, 55%, 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: grid-move 8s linear infinite;
+  }
+
+  /* ─── Helicopter fly animation for welcome screen ─── */
+  @keyframes heli-fly {
+    0% { transform: translateX(-120%) translateY(4px) rotate(-2deg); }
+    30% { transform: translateX(-20%) translateY(-6px) rotate(1deg); }
+    60% { transform: translateX(40%) translateY(2px) rotate(-1deg); }
+    100% { transform: translateX(120%) translateY(-4px) rotate(2deg); }
+  }
+  .animate-heli-fly {
+    animation: heli-fly 6s ease-in-out infinite;
+  }
+
+  @keyframes heli-hover {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-heli-hover {
+    animation: heli-hover 3s ease-in-out infinite;
   }
 }

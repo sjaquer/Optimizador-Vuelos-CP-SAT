@@ -2,61 +2,62 @@
 'use client';
 
 import type { FlightPlan, ScenarioData, TransportItem, MissionDetails } from './types';
-import { ALL_STATIONS } from './stations';
+import { DEFAULT_STATIONS } from './stations';
 
-const HISTORY_KEY = 'ovh_flight_history_v2';
+const HISTORY_KEY = 'ovh_flight_history_v3'; // v3 = sistema de slugs
 const MAX_HISTORY_ITEMS = 20;
 
 export const getHistory = (): ScenarioData[] => {
-  if (typeof window === 'undefined') {
-    return [];
-  }
+  if (typeof window === 'undefined') return [];
   try {
     const historyJson = window.localStorage.getItem(HISTORY_KEY);
     return historyJson ? JSON.parse(historyJson) : [];
   } catch (error) {
-    console.error("Failed to parse history from localStorage", error);
+    console.error('Failed to parse history from localStorage', error);
     return [];
   }
 };
 
-export const saveScenarioToHistory = (scenario: ScenarioData, plans?: Record<string, FlightPlan>): void => {
-   if (typeof window === 'undefined') {
-    return;
+/**
+ * Strips step data from calculated plans to reduce localStorage size.
+ * Only metrics are preserved — steps can be recalculated on demand.
+ */
+function stripStepsFromPlans(plans?: Record<string, FlightPlan>): Record<string, FlightPlan> | undefined {
+  if (!plans) return undefined;
+  const stripped: Record<string, FlightPlan> = {};
+  for (const [key, plan] of Object.entries(plans)) {
+    stripped[key] = { ...plan, steps: [] };
   }
-  let history = getHistory();
-  
-  // Add a unique ID if it doesn't have one
-  const newScenarioWithId: ScenarioData = {
-      ...scenario,
-      id: new Date().toISOString(),
-      calculatedPlans: plans,
-  };
+  return stripped;
+}
 
+export const saveScenarioToHistory = (scenario: ScenarioData, plans?: Record<string, FlightPlan>): void => {
+  if (typeof window === 'undefined') return;
+  const history = getHistory();
+  const newScenarioWithId: ScenarioData = {
+    ...scenario,
+    id: new Date().toISOString(),
+    calculatedPlans: stripStepsFromPlans(plans),
+  };
   const newHistory = [newScenarioWithId, ...history].slice(0, MAX_HISTORY_ITEMS);
-  
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
   } catch (error) {
-    console.error("Failed to save history to localStorage", error);
+    console.error('Failed to save history to localStorage', error);
   }
 };
 
 export const deleteScenarioFromHistory = (scenarioId: string): void => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  let history = getHistory();
-  history = history.filter(s => s.id !== scenarioId);
-
+  if (typeof window === 'undefined') return;
+  const history = getHistory().filter(s => s.id !== scenarioId);
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   } catch (error) {
-     console.error("Failed to update history in localStorage", error);
+    console.error('Failed to update history in localStorage', error);
   }
-}
+};
 
-// ──── Random Scenario Generator ──────────────────────────────────────
+// ──── Random Scenario Generator ─────────────────────────────────────────────
 
 const AREAS = [
   'Operaciones', 'Perforación', 'Logística', 'Mantenimiento',
@@ -86,7 +87,7 @@ const WEATHER_OPTIONS = [
 
 const OPERATIONAL_NOTES_OPTIONS = [
   'Priorizar evacuación de personal turno saliente',
-  'Estación 4 con restricción de peso por terreno blando',
+  'HP Kitepampani con restricción de peso por terreno blando',
   'Ventana operativa reducida: 06:00-14:00',
   'Combustible limitado – máx 4 rotaciones',
   'Carga frágil requiere vuelo directo sin escalas intermedias',
@@ -150,62 +151,80 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function pickUnique<T>(arr: T[], n: number): T[] {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(n, arr.length));
-}
-
 export function generateRandomScenario(): ScenarioData {
-  const numStations = randInt(4, ALL_STATIONS.length - 1);
+  // Seleccionar un subconjunto de estaciones (mínimo 5, máximo todas)
+  // Siempre incluir la base
+  const base = DEFAULT_STATIONS.find(s => s.isBase)!;
+  const others = DEFAULT_STATIONS.filter(s => !s.isBase);
+  const numOthers = randInt(4, others.length);
+  const shuffled = [...others].sort(() => Math.random() - 0.5);
+  const selectedStations = [base, ...shuffled.slice(0, numOthers)];
+
   const helicopterCapacity = pick([6, 8, 10, 12]);
   const helicopterMaxWeight = pick([800, 1000, 1200, 1500]);
   const paxDefaultWeight = pick([75, 80, 85]);
 
-  // Generate between 6 and 18 transport items for a robust test
-  const numItems = randInt(6, 18);
-  const transportItems: TransportItem[] = [];
+  const stationIds = selectedStations.map(s => s.id);
+  const nonBaseIds = selectedStations.filter(s => !s.isBase).map(s => s.id);
 
-  // Ensure a good mix: at least 30% PAX and 30% CARGO
+  // Generar entre 8 y 18 items
+  const numItems = randInt(8, 18);
   const minPax = Math.max(2, Math.floor(numItems * 0.3));
   const minCargo = Math.max(2, Math.floor(numItems * 0.3));
   const paxCount = randInt(minPax, numItems - minCargo);
   const cargoCount = numItems - paxCount;
 
-  // Generate PAX items
+  const transportItems: TransportItem[] = [];
+
+  // PAX items
   for (let i = 0; i < paxCount; i++) {
-    let origin = randInt(0, numStations);
-    let destination = randInt(0, numStations);
-    while (destination === origin) {
-      destination = randInt(0, numStations);
+    let origin = pick(stationIds);
+    let destination = pick(stationIds);
+    let attempts = 0;
+    while (destination === origin && attempts < 10) {
+      destination = pick(stationIds);
+      attempts++;
+    }
+    if (destination === origin) {
+      // fallback: use base as origin or destination
+      origin = base.id;
+      destination = pick(nonBaseIds);
     }
 
+    const qty = randInt(1, 4);
     transportItems.push({
       id: crypto.randomUUID(),
       area: pick(AREAS),
       type: 'PAX',
       shift: pick(['M', 'T']),
-      priority: randInt(1, 5),
-      quantity: 1,
+      priority: pick(['ALTA', 'MEDIA', 'BAJA']),
+      quantity: qty,
       originStation: origin,
       destinationStation: destination,
       weight: paxDefaultWeight,
-      description: `Pasajero de ${pick(AREAS)}`,
+      description: `${qty} Pasajero(s) de ${pick(AREAS)}`,
     });
   }
 
-  // Generate CARGO items
+  // CARGO items
   for (let i = 0; i < cargoCount; i++) {
-    let origin = randInt(0, numStations);
-    let destination = randInt(0, numStations);
-    while (destination === origin) {
-      destination = randInt(0, numStations);
+    let origin = pick(stationIds);
+    let destination = pick(stationIds);
+    let attempts = 0;
+    while (destination === origin && attempts < 10) {
+      destination = pick(stationIds);
+      attempts++;
+    }
+    if (destination === origin) {
+      origin = base.id;
+      destination = pick(nonBaseIds);
     }
 
     const weight = pick([
-      randInt(20, 80),    // light cargo
-      randInt(80, 200),   // medium cargo
-      randInt(200, 500),  // heavy cargo
-      randInt(500, 900),  // very heavy (may push limits)
+      randInt(20, 80),
+      randInt(80, 200),
+      randInt(200, 500),
+      randInt(500, 900),
     ]);
 
     transportItems.push({
@@ -213,7 +232,7 @@ export function generateRandomScenario(): ScenarioData {
       area: pick(AREAS),
       type: 'CARGO',
       shift: pick(['M', 'T']),
-      priority: randInt(1, 5),
+      priority: pick(['ALTA', 'MEDIA', 'BAJA']),
       quantity: 1,
       originStation: origin,
       destinationStation: destination,
@@ -222,7 +241,7 @@ export function generateRandomScenario(): ScenarioData {
     });
   }
 
-  // Shuffle so PAX and CARGO are interleaved
+  // Shuffle items so PAX and CARGO are interleaved
   transportItems.sort(() => Math.random() - 0.5);
 
   const missionDetails: MissionDetails = {
@@ -235,8 +254,10 @@ export function generateRandomScenario(): ScenarioData {
     missionNotes: pick(MISSION_NOTES_OPTIONS),
   };
 
+  const refuelEnabled = pick([true, false]);
+
   return {
-    numStations,
+    stations: selectedStations,
     helicopterCapacity,
     helicopterMaxWeight,
     paxDefaultWeight,
@@ -244,5 +265,10 @@ export function generateRandomScenario(): ScenarioData {
     weatherConditions: pick(WEATHER_OPTIONS),
     operationalNotes: pick(OPERATIONAL_NOTES_OPTIONS),
     missionDetails,
+    refuelConfig: {
+      enabled: refuelEnabled,
+      // Distancias reales en km: autonomía entre 30 y 80 km
+      maxFlightDistance: refuelEnabled ? pick([30, 40, 50, 60]) : 80,
+    },
   };
 }
