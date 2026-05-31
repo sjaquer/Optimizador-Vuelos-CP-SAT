@@ -6,7 +6,7 @@ Una plataforma integral de planificación y optimización de operaciones de tran
 
 ## 📋 Descripción General
 
-**OVH by sjaquer** es una aplicación web especializada para operadores de helicópteros y coordinadores logísticos que necesitan:
+**ORDEV** es una aplicación web especializada para operadores de helicópteros y coordinadores logísticos que necesitan:
 
 - Planificar y optimizar rutas de transporte de pasajeros (PAX) y carga (CARGO)
 - Minimizar tiempos de vuelo y costos operativos
